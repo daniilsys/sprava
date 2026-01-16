@@ -52,7 +52,7 @@ class WebSocketHandlers:
             "is_typing": True,
         }
 
-        await self.manager.send_personal_message(typing_data, receiver_id)
+        await self.manager.send_personal_message(receiver_id, typing_data)
 
     async def handle_stop_typing(self, data, sender_id):
         receiver_id = data.get("receiver_id")
@@ -65,7 +65,7 @@ class WebSocketHandlers:
             "is_typing": False,
         }
 
-        await self.manager.send_personal_message(stop_typing_data, receiver_id)
+        await self.manager.send_personal_message(receiver_id, stop_typing_data)
 
     async def handle_mark_read(self, data, sender_id):
         conversation_id = data.get("conversation_id")
@@ -92,7 +92,7 @@ class WebSocketHandlers:
             "conversation_id": conversation_id,
             "user_id": sender_id,
         }
-        await self.manager.send_personal_message(mark_read_data, other_user_id)
+        await self.manager.send_personal_message(-other_user_id, mark_read_data)
 
     async def handle_get_online_friends(self, data, sender_id):
         friends = self.app.relationships_cache.cache[sender_id]["friends"].get_friends()
@@ -102,7 +102,7 @@ class WebSocketHandlers:
             "type": "online_friends",
             "friends": online_friends,
         }
-        await self.manager.send_personal_message(online_friends_data, sender_id)
+        await self.manager.send_personal_message(sender_id, online_friends_data)
 
     async def notify_status_change(self, user_id, status):
         friends = self.app.relationships_cache.cache[user_id]["friends"].get_friends()
@@ -113,4 +113,4 @@ class WebSocketHandlers:
         }
         for friend_id in friends:
             if self.manager.is_user_online(friend_id):
-                await self.manager.send_personal_message(status_data, friend_id)
+                await self.manager.send_personal_message(friend_id, status_data)

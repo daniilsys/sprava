@@ -9,13 +9,13 @@ class ConnectionManager:
         self.active_connections[user_id].append(websocket)
 
     def disconnect(self, websocket, user_id):
-        if user_id in self. active_connections:
+        if user_id in self.active_connections:
             if websocket in self.active_connections[user_id]:
                 self.active_connections[user_id].remove(websocket)
             if not self.active_connections[user_id]:
                 del self.active_connections[user_id]
 
-    async def send_personal_message(self, message: dict, user_id: int):
+    async def send_personal_message(self, user_id: int, message: dict):
         if user_id in self.active_connections:
             disconnected = []
             for connection in self.active_connections[user_id]:
@@ -27,8 +27,8 @@ class ConnectionManager:
                 self.disconnect(connection, user_id)
 
     async def send_to_conversation(self, message: dict, user1_id, user2_id):
-        await self.send_personal_message(message, user1_id)
-        await self.send_personal_message(message, user2_id)
+        await self.send_personal_message(user1_id, message)
+        await self.send_personal_message(user2_id, message)
 
     def is_user_online(self, user_id: int):
         return user_id in self.active_connections and len(self.active_connections[user_id]) > 0
