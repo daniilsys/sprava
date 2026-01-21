@@ -6,9 +6,9 @@
     <title>Chat Interface</title>
     <style>
         * {
-            margin: 0;
+            margin:  0;
             padding: 0;
-            box-sizing: border-box;
+            box-sizing:  border-box;
         }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -42,7 +42,7 @@
         }
         .conversations-list {
             flex: 1;
-            overflow-y:  auto;
+            overflow-y: auto;
         }
         .conversation-item {
             padding: 15px 20px;
@@ -78,7 +78,7 @@
             border-radius: 50%;
             padding: 2px 8px;
             font-size:  11px;
-            font-weight: bold;
+            font-weight:  bold;
         }
         .chat-area {
             flex: 1;
@@ -87,7 +87,7 @@
             background: #f0f2f5;
         }
         .chat-header {
-            padding:  15px 20px;
+            padding: 15px 20px;
             background: white;
             border-bottom: 1px solid #e0e0e0;
             display: flex;
@@ -123,7 +123,7 @@
             gap: 10px;
         }
         .message {
-            max-width: 60%;
+            max-width:  60%;
             padding: 10px 15px;
             border-radius: 18px;
             word-wrap: break-word;
@@ -155,6 +155,31 @@
         .message-content {
             font-size: 14px;
             line-height: 1.4;
+            margin-bottom: 5px;
+        }
+        .message-media {
+            margin-top: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .message-media img {
+            max-width: 100%;
+            max-height: 300px;
+            border-radius:  8px;
+            cursor: pointer;
+        }
+        .message-media video {
+            max-width: 100%;
+            max-height: 300px;
+            border-radius: 8px;
+        }
+        .media-loading {
+            padding: 10px;
+            background: rgba(0,0,0,0.1);
+            border-radius: 8px;
+            text-align: center;
+            font-size: 12px;
         }
         .message-time {
             font-size: 11px;
@@ -175,7 +200,7 @@
             background: rgba(0,0,0,0.7);
             color: white;
             border: none;
-            padding:  5px 10px;
+            padding: 5px 10px;
             border-radius: 4px;
             cursor: pointer;
             font-size: 11px;
@@ -188,7 +213,13 @@
             background: white;
             border-top: 1px solid #e0e0e0;
             display: flex;
+            flex-direction: column;
             gap: 10px;
+        }
+        .input-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
         }
         .message-input {
             flex: 1;
@@ -201,6 +232,23 @@
         .message-input:focus {
             border-color: #2196f3;
         }
+        .file-input-label {
+            padding: 10px 15px;
+            background: #f0f0f0;
+            border-radius: 24px;
+            cursor: pointer;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+        .file-input-label:hover {
+            background: #e0e0e0;
+        }
+        .file-input {
+            display: none;
+        }
         .send-btn {
             padding: 12px 25px;
             background: #2196f3;
@@ -209,7 +257,7 @@
             border-radius: 24px;
             cursor: pointer;
             font-weight: 600;
-            font-size:  14px;
+            font-size: 14px;
         }
         .send-btn:hover {
             background: #1976d2;
@@ -218,17 +266,61 @@
             background: #ccc;
             cursor: not-allowed;
         }
+        .file-preview-area {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .file-preview {
+            position: relative;
+            width: 80px;
+            height: 80px;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 2px solid #e0e0e0;
+        }
+        .file-preview img,
+        .file-preview video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .file-preview-remove {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            background: rgba(231, 76, 60, 0.9);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .file-preview-icon {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f0f0f0;
+            font-size: 30px;
+        }
         .empty-state {
             flex: 1;
             display:  flex;
-            align-items:  center;
-            justify-content:  center;
+            align-items: center;
+            justify-content: center;
             flex-direction: column;
             color: #65676b;
         }
         .empty-state-icon {
             font-size:  64px;
-            margin-bottom:  20px;
+            margin-bottom: 20px;
         }
         .login-modal {
             position: fixed;
@@ -245,7 +337,7 @@
         .login-box {
             background: white;
             padding: 40px;
-            border-radius: 12px;
+            border-radius:  12px;
             width: 400px;
             max-width:  90%;
         }
@@ -268,8 +360,8 @@
             width: 100%;
             padding: 12px;
             border: 1px solid #ddd;
-            border-radius: 6px;
-            font-size: 14px;
+            border-radius:  6px;
+            font-size:  14px;
         }
         .login-btn {
             width: 100%;
@@ -374,20 +466,29 @@
                 </div>
             </div>
             <div class="input-area">
-                <input type="text" class="message-input" id="message-input" placeholder="Écrivez votre message..." disabled>
-                <button class="send-btn" id="send-btn" onclick="sendMessage()" disabled>Envoyer</button>
+                <div class="file-preview-area" id="file-preview-area"></div>
+                <div class="input-row">
+                    <label class="file-input-label" for="file-input" title="Joindre des fichiers">
+                        📎
+                    </label>
+                    <input type="file" id="file-input" class="file-input" multiple accept="image/*,video/*" onchange="handleFileSelect(event)">
+                    <input type="text" class="message-input" id="message-input" placeholder="Écrivez votre message..." disabled>
+                    <button class="send-btn" id="send-btn" onclick="sendMessage()" disabled>Envoyer</button>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
-        const API_URL = 'http://127.0.0.1:8000';
+        const API_URL = 'http://localhost:8000';
         let currentUser = null;
         let currentToken = null;
         let ws = null;
         let conversations = [];
         let currentConversation = null;
         let messages = {};
+        let selectedFiles = [];
+        let mediaPollingTimers = {};
 
         function switchTab(tab) {
             document.querySelectorAll('.login-tab').forEach(t => t.classList.remove('active'));
@@ -423,7 +524,7 @@
                     connectWebSocket();
                     loadConversations();
                 } else {
-                    alert('Erreur de connexion:  ' + result.message);
+                    alert('Erreur de connexion: ' + result.message);
                 }
             } catch (error) {
                 alert('Erreur:  ' + error);
@@ -461,7 +562,7 @@
         }
 
         function connectWebSocket() {
-            ws = new WebSocket(`ws://127.0.0.1:8000/ws/${currentToken}`);
+            ws = new WebSocket(`ws://${API_URL.replace('http://', '')}/ws/${currentToken}`);
 
             ws.onopen = () => {
                 document.getElementById('ws-dot').classList.add('connected');
@@ -480,27 +581,139 @@
         }
 
         function handleWebSocketMessage(data) {
+            console.log('📨 WebSocket reçu:', data);
+            
             if (data.type === 'new_message') {
                 if (! messages[data.conversation_id]) {
                     messages[data.conversation_id] = [];
                 }
-                messages[data.conversation_id].push({
-                    id: data.message_id,
+                
+                const newMessage = {
+                    id:  data.message_id,
                     sender_id: data.sender_id,
                     content: data.content,
-                    created_at: data.created_at
-                });
+                    created_at: data.created_at,
+                    media_ids: [],
+                    media_loading:  true
+                };
+                
+                messages[data.conversation_id].push(newMessage);
                 
                 if (currentConversation && currentConversation.id === data.conversation_id) {
                     displayMessages();
                     markAsRead(data.conversation_id);
                 }
+                
+                pollMediaForMessage(data.message_id, data.conversation_id, 0);
+                
                 loadConversations();
+                
+            } else if (data.type === 'media_uploaded') {
+                console.log('📤 Médias uploadés:', data);
+                updateMessageMedia(data.message_id, data.all_media_ids || data.media_ids, data.conversation_id);
+                
             } else if (data.type === 'delete_message') {
                 for (let convId in messages) {
                     messages[convId] = messages[convId].filter(m => m.id !== data.message_id);
                 }
                 if (currentConversation) {
+                    displayMessages();
+                }
+            }
+        }
+
+        async function pollMediaForMessage(messageId, conversationId, attempt) {
+            const maxAttempts = 10;
+            const delays = [500, 500, 1000, 1000, 2000, 2000, 3000, 3000, 5000, 5000];
+            
+            if (attempt >= maxAttempts) {
+                console.log(`⚠️ Abandon du polling pour message ${messageId} après ${maxAttempts} tentatives`);
+                
+                const msg = messages[conversationId]?.find(m => m.id === messageId);
+                if (msg) {
+                    msg.media_loading = false;
+                    if (currentConversation && currentConversation.id === conversationId) {
+                        displayMessages();
+                    }
+                }
+                return;
+            }
+            
+            try {
+                console.log(`🔄 Tentative ${attempt + 1}/${maxAttempts} de chargement des médias pour message ${messageId}`);
+                
+                const response = await fetch(`${API_URL}/media/message/?message_id=${messageId}`, {
+                    headers: {'Authorization': currentToken}
+                });
+                
+                if (!response.ok) {
+                    if (response.status === 404) {
+                        console.log(`⏳ Pas encore de médias (404), nouvelle tentative dans ${delays[attempt]}ms`);
+                        mediaPollingTimers[messageId] = setTimeout(() => {
+                            pollMediaForMessage(messageId, conversationId, attempt + 1);
+                        }, delays[attempt]);
+                        return;
+                    }
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                const mediaIds = await response.json();
+                
+                console.log(`📦 Réponse de l'API: `, mediaIds);
+                
+                const msg = messages[conversationId]?.find(m => m.id === messageId);
+                
+                if (! msg) {
+                    console.log(`⚠️ Message ${messageId} introuvable dans la conversation ${conversationId}`);
+                    return;
+                }
+                
+                if (Array.isArray(mediaIds) && mediaIds.length > 0) {
+                    console.log(`✅ ${mediaIds.length} média(s) trouvé(s) pour message ${messageId}`);
+                    msg.media_ids = mediaIds;
+                    msg.media_loading = false;
+                    
+                    if (mediaPollingTimers[messageId]) {
+                        clearTimeout(mediaPollingTimers[messageId]);
+                        delete mediaPollingTimers[messageId];
+                    }
+                    
+                    if (currentConversation && currentConversation.id === conversationId) {
+                        displayMessages();
+                    }
+                } else if (Array.isArray(mediaIds) && mediaIds.length === 0) {
+                    console.log(`⏳ Liste vide, nouvelle tentative dans ${delays[attempt]}ms`);
+                    mediaPollingTimers[messageId] = setTimeout(() => {
+                        pollMediaForMessage(messageId, conversationId, attempt + 1);
+                    }, delays[attempt]);
+                } else {
+                    console.error(`❌ Format de réponse inattendu: `, mediaIds);
+                    msg.media_loading = false;
+                }
+                
+            } catch (error) {
+                console.error(`❌ Erreur polling médias (tentative ${attempt + 1}):`, error);
+                
+                mediaPollingTimers[messageId] = setTimeout(() => {
+                    pollMediaForMessage(messageId, conversationId, attempt + 1);
+                }, delays[attempt]);
+            }
+        }
+
+        function updateMessageMedia(messageId, mediaIds, conversationId) {
+            console.log(`🔄 Mise à jour médias pour message ${messageId}: `, mediaIds);
+            
+            const msg = messages[conversationId]?.find(m => m.id === messageId);
+            if (msg) {
+                msg.media_ids = Array.isArray(mediaIds) ?mediaIds : [];
+                msg.media_loading = false;
+                
+                if (mediaPollingTimers[messageId]) {
+                    clearTimeout(mediaPollingTimers[messageId]);
+                    delete mediaPollingTimers[messageId];
+                }
+                
+                if (currentConversation && currentConversation.id === conversationId) {
                     displayMessages();
                 }
             }
@@ -533,7 +746,7 @@
                     div.classList.add('active');
                 }
                 
-                const unreadBadge = conv.unread_count > 0 ? 
+                const unreadBadge = conv.unread_count > 0 ?
                     `<span class="unread-badge">${conv.unread_count}</span>` : '';
                 
                 div.innerHTML = `
@@ -570,7 +783,11 @@
                 const result = await response.json();
                 
                 if (result.status_code === 200) {
-                    messages[conversationId] = result.messages;
+                    messages[conversationId] = result.messages.map(msg => ({
+                        ...msg,
+                        media_ids: msg.media_ids || [],
+                        media_loading: false
+                    }));
                     displayMessages();
                 }
             } catch (error) {
@@ -578,15 +795,15 @@
             }
         }
 
-        function displayMessages() {
+        async function displayMessages() {
             const container = document.getElementById('messages-container');
             container.innerHTML = '';
             
             const convMessages = messages[currentConversation.id] || [];
             
-            convMessages.forEach(msg => {
+            for (const msg of convMessages) {
                 const div = document.createElement('div');
-                div.className = `message ${msg.sender_id === currentUser.user_id ? 'sent' :  'received'}`;
+                div.className = `message ${msg.sender_id === currentUser.user_id ?'sent' :  'received'}`;
                 div.dataset.messageId = msg.id;
                 
                 const time = new Date(msg.created_at).toLocaleTimeString('fr-FR', {
@@ -594,59 +811,201 @@
                     minute: '2-digit'
                 });
                 
-                const deleteBtn = msg.sender_id === currentUser.user_id ? 
+                const deleteBtn = msg.sender_id === currentUser.user_id ?
                     `<div class="message-actions">
                         <button class="message-action-btn" onclick="deleteMessage(${msg.id})">🗑️ Supprimer</button>
                     </div>` : '';
                 
+                const textContent = msg.content ? `<div class="message-content">${msg.content}</div>` : '';
+                
+                let mediaContent = '';
+                if (msg.media_ids && msg.media_ids.length > 0) {
+                    mediaContent = `<div class="message-media" id="media-${msg.id}"></div>`;
+                } else if (msg.media_loading) {
+                    mediaContent = `<div class="message-media" id="media-${msg.id}">
+                        <div class="media-loading">⏳ Chargement des médias...</div>
+                    </div>`;
+                }
+                
                 div.innerHTML = `
                     ${deleteBtn}
-                    <div class="message-content">${msg.content}</div>
+                    ${textContent}
+                    ${mediaContent}
                     <div class="message-time">${time}</div>
                 `;
                 
                 container.appendChild(div);
-            });
+                
+                if (msg.media_ids && msg.media_ids.length > 0) {
+                    loadMediaForMessage(msg.id, msg.media_ids);
+                }
+            }
             
             container.scrollTop = container.scrollHeight;
+        }
+
+        async function loadMediaForMessage(messageId, mediaIds) {
+            const mediaContainer = document.getElementById(`media-${messageId}`);
+            if (! mediaContainer) return;
+            
+            mediaContainer.innerHTML = '';
+            
+            for (const mediaId of mediaIds) {
+                try {
+                    const mediaElement = document.createElement('div');
+                    mediaElement.style.cssText = 'position: relative; margin-bottom: 5px;';
+                    
+                    const mediaUrl = `${API_URL}/media/?media_id=${mediaId}`;
+                    
+                    const img = document.createElement('img');
+                    img.src = mediaUrl;
+                    img.alt = `Media ${mediaId}`;
+                    img.onclick = () => window.open(mediaUrl, '_blank');
+                    img.style.display = 'block';
+                    
+                    img.onerror = () => {
+                        mediaElement.innerHTML = '';
+                        const video = document.createElement('video');
+                        video.src = mediaUrl;
+                        video.controls = true;
+                        video.preload = 'metadata';
+                        video.style.display = 'block';
+                        mediaElement.appendChild(video);
+                    };
+                    
+                    mediaElement.appendChild(img);
+                    mediaContainer.appendChild(mediaElement);
+                } catch (error) {
+                    console.error(`❌ Erreur chargement média ${mediaId}:`, error);
+                }
+            }
+        }
+
+        function handleFileSelect(event) {
+            const files = Array.from(event.target.files);
+            selectedFiles = [...selectedFiles, ...files];
+            displayFilePreview();
+        }
+
+        function displayFilePreview() {
+            const previewArea = document.getElementById('file-preview-area');
+            previewArea.innerHTML = '';
+            
+            selectedFiles.forEach((file, index) => {
+                const preview = document.createElement('div');
+                preview.className = 'file-preview';
+                
+                const removeBtn = document.createElement('button');
+                removeBtn.className = 'file-preview-remove';
+                removeBtn.innerHTML = '×';
+                removeBtn.onclick = () => removeFile(index);
+                
+                if (file.type.startsWith('image/')) {
+                    const img = document.createElement('img');
+                    img.src = URL.createObjectURL(file);
+                    preview.appendChild(img);
+                } else if (file.type.startsWith('video/')) {
+                    const video = document.createElement('video');
+                    video.src = URL.createObjectURL(file);
+                    preview.appendChild(video);
+                } else {
+                    const icon = document.createElement('div');
+                    icon.className = 'file-preview-icon';
+                    icon.textContent = '📄';
+                    preview.appendChild(icon);
+                }
+                
+                preview.appendChild(removeBtn);
+                previewArea.appendChild(preview);
+            });
+        }
+
+        function removeFile(index) {
+            selectedFiles.splice(index, 1);
+            displayFilePreview();
         }
 
         async function sendMessage() {
             const input = document.getElementById('message-input');
             const content = input.value.trim();
             
-            if (! content || !currentConversation) return;
+            if (!content && selectedFiles.length === 0) {
+                alert('Écrivez un message ou sélectionnez des fichiers');
+                return;
+            }
+            
+            if (! currentConversation) return;
             
             try {
                 const response = await fetch(`${API_URL}/conversation/send_message`, {
                     method: 'POST',
                     headers: {
-                        'Content-Type':  'application/json',
+                        'Content-Type': 'application/json',
                         'Authorization': currentToken
                     },
                     body: JSON.stringify({
                         conversation_id: currentConversation.id,
-                        content: content
+                        content: content || ''
                     })
                 });
                 const result = await response.json();
                 
                 if (result.status_code === 200) {
+                    const messageId = result.message_id;
+                    const mediaIds = [];
+                    
+                    for (const file of selectedFiles) {
+                        try {
+                            const formData = new FormData();
+                            formData.append('file', file);
+                            
+                            console.log(`📤 Upload fichier: ${file.name}`);
+                            
+                            const uploadResponse = await fetch(`${API_URL}/media/upload?message_id=${messageId}`, {
+                                method: 'POST',
+                                headers: {
+                                    'Authorization': currentToken
+                                },
+                                body: formData
+                            });
+                            
+                            const uploadResult = await uploadResponse.json();
+                            console.log('✅ Upload résultat:', uploadResult);
+                            
+                            if (uploadResult.media_id) {
+                                mediaIds.push(uploadResult.media_id);
+                            } else if (uploadResult.id) {
+                                mediaIds.push(uploadResult.id);
+                            }
+                        } catch (uploadError) {
+                            console.error('❌ Erreur upload fichier:', uploadError);
+                        }
+                    }
+                    
                     if (! messages[currentConversation.id]) {
                         messages[currentConversation.id] = [];
                     }
                     messages[currentConversation.id].push({
-                        id: result.message_id,
+                        id: messageId,
                         sender_id: currentUser.user_id,
-                        content:  result.content,
-                        created_at: new Date().toISOString()
+                        content: content,
+                        created_at: new Date().toISOString(),
+                        media_ids: mediaIds,
+                        media_loading: false
                     });
+                    
+                    console.log(`✅ Message ${messageId} envoyé avec ${mediaIds.length} média(s)`);
+                    
                     displayMessages();
                     input.value = '';
+                    selectedFiles = [];
+                    displayFilePreview();
+                    document.getElementById('file-input').value = '';
                     loadConversations();
                 }
             } catch (error) {
-                console.error('Erreur envoi message:', error);
+                console.error('❌ Erreur envoi message:', error);
+                alert('Erreur lors de l\'envoi du message');
             }
         }
 

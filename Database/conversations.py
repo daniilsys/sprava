@@ -118,7 +118,7 @@ class ConversationManager:
             conn.close()
 
     def get_messages(self, conversation_id, limit=50, offset=0):
-        conn, cursor = self.cache.app.get_cursor()
+        conn, cursor = self.cache. app.get_cursor()
         try:
             cursor.execute("""
                 SELECT * FROM conversations 
@@ -143,7 +143,34 @@ class ConversationManager:
             """, (conversation_id, limit, offset))
 
             messages = cursor.fetchall()
-            return list(messages)
+
+            if not messages: 
+                return []
+            
+            message_ids = [msg["id"] for msg in messages]
+            
+            placeholders = ','.join(['%s'] * len(message_ids))
+            cursor.execute(f"""
+                SELECT message_id, id
+                FROM media
+                WHERE message_id IN ({placeholders})
+                ORDER BY id ASC
+            """, message_ids)
+            
+            media_results = cursor.fetchall()
+            
+            media_ids_by_message = {}
+            for media in media_results: 
+                message_id = media["message_id"]
+                media_id = media["id"]
+                if message_id not in media_ids_by_message:
+                    media_ids_by_message[message_id] = []
+                media_ids_by_message[message_id].append(media_id)
+            
+            for msg in messages:
+                msg["media_ids"] = media_ids_by_message.get(msg["id"], [])
+            return messages
+            
         finally:
             cursor.close()
             conn.close()

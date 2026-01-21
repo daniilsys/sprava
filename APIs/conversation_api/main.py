@@ -108,7 +108,7 @@ class ConversationsAPI:
             
             conversation_manager = self.app.conversations_cache.cache[user.user_id]
             messages = conversation_manager.get_messages(conversation_id, limit, offset)
-
+            
             return {
                 "status_code": 200,
                 "messages": messages
@@ -128,15 +128,16 @@ class ConversationsAPI:
                 }
 
             message_id = conversation_manager.send_message(data.conversation_id, data.content)
+
             await self.app.websocket_managers.send_personal_message(other_user_id, {
                 "type": "new_message",
                 "conversation_id": data.conversation_id,
                 "message_id": message_id,
                 "sender_id": user.user_id,
                 "content": data.content,
-                "created_at": datetime.now().isoformat()
+                "created_at": datetime.now().isoformat(),
+                "media_ids": []
             })
-
 
             return {
                 "status_code": 200,

@@ -1,6 +1,9 @@
 from pydantic import BaseModel
-from fastapi import HTTPException, Header
+from fastapi import HTTPException, Header, UploadFile, File
 from typing import Optional
+import bcrypt
+from pathlib import Path
+import uuid
 
 class UserInfoDatas(BaseModel):
     user_id: int
@@ -13,11 +16,24 @@ class FriendRequestDatas(BaseModel):
     sender_id: Optional[int] = None
     friend_id: Optional[int] = None
 
+class UserUpdateDatas(BaseModel):
+    username: Optional[str] = None
+    mail: Optional[str] = None
+    date_of_birth: Optional[str] = None
+    password: Optional[str] = None
+
 class UserAPI:
     def __init__(self, app):
         self.app = app
         self.get_user()
         self.get_user_batch()
+        self.get_user_from_username()
+        
+        self.change_username()
+        self.change_password()
+        self.change_date_of_birth()
+        self.change_mail()
+        self.change_avatar()
 
         self.get_friends()
         self.remove_friend()
@@ -45,7 +61,7 @@ class UserAPI:
     def get_user(self):
         @self.app.get("/user", tags=["User Info"])
         def root(user_id:  int, authorization: str = Header(None)):
-            requester = self._get_user_from_token(authorization)
+            self._get_user_from_token(authorization)
             
             if user_id not in self.app.users_cache.cache:
                 return {
@@ -58,9 +74,28 @@ class UserAPI:
                 "user_id": user.user_id,
                 "username": user.get("username"),
                 "mail": user.get("mail"),
-                "date_of_birth": user.get("date_of_birth")
+                "date_of_birth": user.get("date_of_birth"),
+                "avatar_id": user.get("avatar_id")
             }
+    def get_user_from_username(self):
+        @self.app.get("/user/username", tags=["User Info"])
+        def root(username: str, authorization: str = Header(None)):
+            self._get_user_from_token(authorization)
 
+            for user in self.app.users_cache.cache.values():
+                if user.get("username") == username:
+                    return {
+                        "status_code": 200,
+                        "user_id": user.user_id,
+                        "username": user.get("username"),
+                        "mail": user.get("mail"),
+                        "date_of_birth": user.get("date_of_birth"),
+                        "avatar_id": user.get("avatar_id")
+                    }
+            return {
+                "status_code": 404,
+                "message": "The given username is not related to any users."
+            }
     def get_user_batch(self):
         @self.app.post("/user/batch", tags=["User Info"])
         def root(data: UserBatchInfoDatas, authorization: str = Header(None)):
@@ -76,13 +111,106 @@ class UserAPI:
                         "user_id": user.user_id,
                         "username": user.get("username"),
                         "mail": user.get("mail"),
-                        "date_of_birth": user.get("date_of_birth")
+                        "date_of_birth": user.get("date_of_birth"),
+                        "avatar_id": user.get("avatar_id")
                     })
 
             return {
                 "status_code":  200,
                 "users":  users_info
             }
+        
+
+    def change_username(self):
+        @self.app.post("/me/change_username", tags=["User Info"])
+        def root(data: UserUpdateDatas, authorization: str = Header(None)):
+            user = self._get_user_from_token(authorization)
+            username = data.get("username")
+
+            user.set("username", username)
+            user.save()
+            return {
+                "status_code": 200,
+                "message": "Username updated.",
+                "user_id": user.user_id,
+                "new_username": username
+            }
+    def change_password(self):
+        @self.app.post("/me/change_password", tags=["User Info"])
+        def root(data: UserUpdateDatas, authorization: str = Header(None)):
+            user = self._get_user_from_token(authorization)
+            password_hash = bcrypt.hashpw(
+                data.password.encode("utf-8"),
+                bcrypt.gensalt()
+            ).decode("utf-8")
+            user.set("password_hash", password_hash)
+            user.save()
+            return {
+                "status_code": 200,
+                "message": "Password updated.",
+                "user_id": user.user_id
+            }
+        
+    def change_date_of_birth(self):
+        @self.app.post("/me/change_date_of_birth", tags=["User Info"])
+        def root(data: UserUpdateDatas, authorization: str = Header(None)):
+            user = self._get_user_from_token(authorization)
+            date_of_birth = data.get("date_of_birth")
+            user.set("date_of_birth", date_of_birth)
+            user.save()
+            return {
+                "status_code": 200,
+                "message": "Date of birth updated.",
+                "user_id": user.user_id,
+                "new_date_of_birth": date_of_birth
+            }
+        
+    def change_mail(self):
+        @self.app.post("/me/change_mail", tags=["User Info"])
+        def root(data: UserUpdateDatas, authorization: str = Header(None)):
+            mail = data.get("mail")
+            user = self._get_user_from_token(authorization)
+            user.set("mail", mail)
+            user.save()
+            return {
+                "status_code": 200,
+                "message": "Mail updated.",
+                "user_id": user.user_id,
+                "new_mail": mail
+            }
+        
+    def change_avatar(self):
+        @self.app.post("/me/change_avatar", tags=["User Info"])
+        async def root(file: UploadFile = File(...), authorization: str = Header(None)):
+            user = self._get_user_from_token(authorization)
+            ext = Path(file.filename).suffix
+            if ext.lower() not in [".jpg", ".jpeg", ".png", ".gif"]:
+                return {
+                    "status_code": 400,
+                    "message": "Invalid file type. Only .jpg, .jpeg, .png, .gif are allowed."
+                }
+            
+            contents = await file.read()
+            file_size = len(contents) / (1024 * 1024)
+            if file_size > 5:
+                return {
+                    "status_code": 413,
+                    "message": "File size exceeds the maximum limit of 5 MB."
+                }
+            id = uuid.uuid4()
+            filename = f"{id}{ext}"
+            self.app.medias.save_avatar(filename, contents)
+
+            user.set("avatar_id", id)
+            user.save()
+
+            return {
+                "status_code": 200,
+                "message": "Avatar updated.",
+                "user_id": user.user_id,
+                "avatar_id": id
+            }
+        
 
     def get_friends(self):
         @self.app.get("/me/friends", tags=["Friends"])

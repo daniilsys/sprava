@@ -16,7 +16,9 @@ class UsersCache:
                 mail VARCHAR(255) NOT NULL UNIQUE,
                 password_hash VARCHAR(255) NOT NULL,
                 date_of_birth VARCHAR(10),
+                avatar_id VARCHAR(255),
                 api_token VARCHAR(255) NOT NULL UNIQUE
+                
             )
             """)
             users = self.get_users()
@@ -38,6 +40,8 @@ class UsersCache:
             )
             user_id = cursor.lastrowid
             self.cache[user_id] = UserManager(user_id, data, self)
+            self.app.conversation_cache.init_table()
+            self.app.relationships_cache.init_table()
             return self.cache[user_id]
         finally: 
             cursor.close()
@@ -86,7 +90,6 @@ class UserManager:
         self.data[key] = value
         self.data["dirty"] = True
         return self
-
     def save(self):
         if not self.data.get("dirty"):
             return
@@ -98,7 +101,8 @@ class UserManager:
                     mail=%s,
                     password_hash=%s,
                     date_of_birth=%s,
-                    api_token=%s
+                    api_token=%s,
+                    avatar_id=%s
                 WHERE id=%s;
             """, (
                 self.data["username"],
@@ -106,6 +110,7 @@ class UserManager:
                 self.data["password_hash"],
                 self.data["date_of_birth"],
                 self.data["api_token"],
+                self.data["avatar_id"],
                 self.user_id
             ))
             self.data["dirty"] = False
