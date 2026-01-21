@@ -40,7 +40,7 @@ class UsersCache:
             )
             user_id = cursor.lastrowid
             self.cache[user_id] = UserManager(user_id, data, self)
-            self.app.conversation_cache.init_table()
+            self.app.conversations_cache.init_table()
             self.app.relationships_cache.init_table()
             return self.cache[user_id]
         finally: 
