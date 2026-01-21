@@ -24,7 +24,7 @@ class MediaAPI:
     
 
     def get_media(self):
-        @self.app.get("/media/", tags=["Media"])
+        @self.app.get("/media/", tags=["Media"], description="Retrieve a media file by its ID.")
         def root(media_id: int, authorization: str = Header(None)):
             media_path = self.app.medias.get_file(media_id)
             if not media_path:
@@ -33,19 +33,20 @@ class MediaAPI:
             return FileResponse(media_path)
         
     def get_avatar(self):
-        @self.app.get("/media/avatar", tags=["Media"])
+        @self.app.get("/media/avatar", tags=["Media"], description="Retrieve a user's avatar by its ID.")
         def root(avatar_id: str, authorization: str = Header(None)):
             self._get_user_from_token(authorization)
 
             media_dir = Path("media/avatars")
             file_path = media_dir / avatar_id
+            print(file_path)
             if not file_path.exists():
                 raise HTTPException(status_code=404, detail="Avatar not found")
 
             return FileResponse(file_path)
         
     def get_message_media(self):
-        @self.app.get("/media/message/", tags=["Media"])
+        @self.app.get("/media/message/", tags=["Media"], description="Retrieve all media IDs associated with a specific message.")
         def root(message_id: int, authorization: str = Header(None)):
             self._get_user_from_token(authorization)
 
@@ -56,7 +57,7 @@ class MediaAPI:
             return media_ids
         
     def upload_media(self):
-        @self.app.post("/media/upload", tags=["Media"])
+        @self.app.post("/media/upload", tags=["Media"], description="Upload a media file associated with a specific message.")
         async def root(message_id: int, file: UploadFile = File(...), authorization: str = Header(None)):
             self._get_user_from_token(authorization)
 

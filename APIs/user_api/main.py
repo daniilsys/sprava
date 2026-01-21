@@ -59,7 +59,7 @@ class UserAPI:
         return user
     
     def get_user(self):
-        @self.app.get("/user", tags=["User Info"])
+        @self.app.get("/user", tags=["User Info"], description="Retrieve user information by user ID.")
         def root(user_id:  int, authorization: str = Header(None)):
             self._get_user_from_token(authorization)
             
@@ -78,7 +78,7 @@ class UserAPI:
                 "avatar_id": user.get("avatar_id")
             }
     def get_user_from_username(self):
-        @self.app.get("/user/username", tags=["User Info"])
+        @self.app.get("/user/username", tags=["User Info"], description="Retrieve user information by username.")
         def root(username: str, authorization: str = Header(None)):
             self._get_user_from_token(authorization)
 
@@ -97,7 +97,7 @@ class UserAPI:
                 "message": "The given username is not related to any users."
             }
     def get_user_batch(self):
-        @self.app.post("/user/batch", tags=["User Info"])
+        @self.app.post("/user/batch", tags=["User Info"], description="Retrieve user information for a batch of user IDs.")
         def root(data: UserBatchInfoDatas, authorization: str = Header(None)):
             self._get_user_from_token(authorization)
 
@@ -122,7 +122,7 @@ class UserAPI:
         
 
     def change_username(self):
-        @self.app.post("/me/change_username", tags=["User Info"])
+        @self.app.post("/me/change_username", tags=["User Info"], description="Change your username.")
         def root(data: UserUpdateDatas, authorization: str = Header(None)):
             user = self._get_user_from_token(authorization)
             username = data.get("username")
@@ -136,7 +136,7 @@ class UserAPI:
                 "new_username": username
             }
     def change_password(self):
-        @self.app.post("/me/change_password", tags=["User Info"])
+        @self.app.post("/me/change_password", tags=["User Info"], description="Change your password.")
         def root(data: UserUpdateDatas, authorization: str = Header(None)):
             user = self._get_user_from_token(authorization)
             password_hash = bcrypt.hashpw(
@@ -152,7 +152,7 @@ class UserAPI:
             }
         
     def change_date_of_birth(self):
-        @self.app.post("/me/change_date_of_birth", tags=["User Info"])
+        @self.app.post("/me/change_date_of_birth", tags=["User Info"], description="Change your date of birth.")
         def root(data: UserUpdateDatas, authorization: str = Header(None)):
             user = self._get_user_from_token(authorization)
             date_of_birth = data.get("date_of_birth")
@@ -166,7 +166,7 @@ class UserAPI:
             }
         
     def change_mail(self):
-        @self.app.post("/me/change_mail", tags=["User Info"])
+        @self.app.post("/me/change_mail", tags=["User Info"], description="Change your email address.")
         def root(data: UserUpdateDatas, authorization: str = Header(None)):
             mail = data.get("mail")
             user = self._get_user_from_token(authorization)
@@ -180,7 +180,7 @@ class UserAPI:
             }
         
     def change_avatar(self):
-        @self.app.post("/me/change_avatar", tags=["User Info"])
+        @self.app.post("/me/change_avatar", tags=["User Info"], description="Change your avatar.")
         async def root(file: UploadFile = File(...), authorization: str = Header(None)):
             user = self._get_user_from_token(authorization)
             ext = Path(file.filename).suffix
@@ -201,7 +201,7 @@ class UserAPI:
             filename = f"{id}{ext}"
             self.app.medias.save_avatar(filename, contents)
 
-            user.set("avatar_id", id)
+            user.set("avatar_id", f"{id}{ext}")
             user.save()
 
             return {
@@ -213,7 +213,7 @@ class UserAPI:
         
 
     def get_friends(self):
-        @self.app.get("/me/friends", tags=["Friends"])
+        @self.app.get("/me/friends", tags=["Friends"], description="Retrieve a list of your friend's user IDs.")
         def root(authorization:  str = Header(None)):
             user = self._get_user_from_token(authorization)
 
@@ -224,7 +224,7 @@ class UserAPI:
             }
 
     def remove_friend(self):
-        @self.app.delete("/me/remove_friend", tags=["Friends"])
+        @self.app.delete("/me/remove_friend", tags=["Friends"], description="Remove a friend from your friends list.")
         def root(data: FriendRequestDatas, authorization: str = Header(None)):
             user = self._get_user_from_token(authorization)
 
@@ -253,7 +253,7 @@ class UserAPI:
             }
 
     def get_friend_requests(self):
-        @self.app.get("/me/friend_requests", tags=["Friends Requests"])
+        @self.app.get("/me/friend_requests", tags=["Friends Requests"], description="Retrieve a list of your received friend request IDs.")
         def root(authorization: str = Header(None)):
             user = self._get_user_from_token(authorization)
 
@@ -264,7 +264,7 @@ class UserAPI:
             }
 
     def send_friend_request(self):
-        @self.app.post("/me/send_friend_request", tags=["Friends Requests"])
+        @self.app.post("/me/send_friend_request", tags=["Friends Requests"], description="Send a friend request to another user.")
         async def root(data: FriendRequestDatas, authorization: str = Header(None)):
             user = self._get_user_from_token(authorization)
 
@@ -311,7 +311,7 @@ class UserAPI:
             }
 
     def cancel_friend_request(self):
-        @self.app.delete("/me/cancel_friend_request", tags=["Friends Requests"])
+        @self.app.delete("/me/cancel_friend_request", tags=["Friends Requests"], description="Cancel a sent friend request.")
         def root(data: FriendRequestDatas, authorization: str = Header(None)):
             user = self._get_user_from_token(authorization)
 
@@ -339,7 +339,7 @@ class UserAPI:
             }
 
     def accept_friend_request(self):
-        @self.app.post("/me/accept_friend_request", tags=["Friends Requests"])
+        @self.app.post("/me/accept_friend_request", tags=["Friends Requests"], description="Accept a received friend request.")
         async def root(data: FriendRequestDatas, authorization: str = Header(None)):
             user = self._get_user_from_token(authorization)
 
@@ -372,7 +372,7 @@ class UserAPI:
             }
 
     def reject_friend_request(self):
-        @self.app.delete("/me/reject_friend_request", tags=["Friends Requests"])
+        @self.app.delete("/me/reject_friend_request", tags=["Friends Requests"], description="Reject a received friend request.")
         def root(data: FriendRequestDatas, authorization:  str = Header(None)):
             user = self._get_user_from_token(authorization)
 
@@ -400,7 +400,7 @@ class UserAPI:
             }
 
     def get_blocked_users(self):
-        @self.app.get("/me/blocked_users", tags=["Blocked Users"])
+        @self.app.get("/me/blocked_users", tags=["Blocked Users"], description="Retrieve a list of your blocked user IDs.")
         def root(authorization: str = Header(None)):
             user = self._get_user_from_token(authorization)
 
@@ -411,7 +411,7 @@ class UserAPI:
             }
 
     def block_user(self):
-        @self.app.post("/me/block_user", tags=["Blocked Users"])
+        @self.app.post("/me/block_user", tags=["Blocked Users"], description="Block a user.")
         def root(data: FriendRequestDatas, authorization: str = Header(None)):
             user = self._get_user_from_token(authorization)
 
@@ -433,7 +433,7 @@ class UserAPI:
             }
 
     def unblock_user(self):
-        @self.app.delete("/me/unblock_user", tags=["Blocked Users"])
+        @self.app.delete("/me/unblock_user", tags=["Blocked Users"], description="Unblock a user.")
         def root(data:  FriendRequestDatas, authorization: str = Header(None)):
             user = self._get_user_from_token(authorization)
 

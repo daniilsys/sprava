@@ -44,7 +44,8 @@ class ConversationsAPI:
         return user
 
     def create_conversation(self):
-        @self.app.post("/create_conversation", tags=["Conversations"])
+        @self.app.post("/create_conversation", tags=["Conversations"],
+                       description="Create a new conversation with a friend.")
         async def root(data: ConversationCreationDatas, authorization: str = Header(None)):
             user = self._get_user_from_token(authorization)
             
@@ -78,7 +79,8 @@ class ConversationsAPI:
             }
 
     def delete_conversation(self):
-        @self.app.delete("/delete_conversation", tags=["Conversations"])
+        @self.app.delete("/delete_conversation", tags=["Conversations"], 
+                        description="Delete a conversation.")
         def root(data: ConversationRequestDatas, authorization: str = Header(None)):
             user = self._get_user_from_token(authorization)
             
@@ -90,7 +92,8 @@ class ConversationsAPI:
             }
 
     def get_conversations(self):
-        @self.app.get("/me/conversations", tags=["Conversations"])
+        @self.app.get("/me/conversations", tags=["Conversations"],
+                      description="Retrieve a list of your conversations with informations about it, such as last message, unread messages, etc.")
         def root(authorization: str = Header(None)):
             user = self._get_user_from_token(authorization)
             
@@ -102,7 +105,8 @@ class ConversationsAPI:
             }
 
     def get_conversation_messages(self):
-        @self.app.get("/conversation/messages", tags=["Conversations"])
+        @self.app.get("/conversation/messages", tags=["Conversations"], 
+                      description="Retrieve messages from a specific conversation.")
         def root(conversation_id: int, limit: int = 50, offset:  int = 0, authorization: str = Header(None)):
             user = self._get_user_from_token(authorization)
             
@@ -115,7 +119,7 @@ class ConversationsAPI:
             }
 
     def conversation_send_message(self):
-        @self.app.post("/conversation/send_message", tags=["Conversations"])
+        @self.app.post("/conversation/send_message", tags=["Conversations"], description="Send a message in a specific conversation.")
         async def root(data: ConversationMessageSendDatas, authorization:  str = Header(None)):
             user = self._get_user_from_token(authorization)
             conversation_manager = self.app.conversations_cache.cache[user.user_id]
@@ -147,7 +151,7 @@ class ConversationsAPI:
             }
 
     def conversation_delete_message(self):
-        @self.app.delete("/conversation/delete_message", tags=["Conversations"])
+        @self.app.delete("/conversation/delete_message", tags=["Conversations"], description="Delete a message you have sent in a conversation.")
         async def root(data: ConversationMessageDeleteDatas, authorization: str = Header(None)):
             user = self._get_user_from_token(authorization)
             
@@ -178,7 +182,7 @@ class ConversationsAPI:
             }
 
     def conversation_read(self):
-        @self.app.put("/conversation/read", tags=["Conversations"])
+        @self.app.put("/conversation/read", tags=["Conversations"], description="Mark messages as read in a specific conversation.")
         async def root(data: ConversationRequestDatas, authorization: str = Header(None)):
             user = self._get_user_from_token(authorization)
             

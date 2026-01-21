@@ -396,6 +396,99 @@
             border-bottom-color: #2196f3;
             color: #2196f3;
         }
+        .sidebar-content {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+        .toolbox {
+            padding: 15px 15px 25px;
+            background: #f9fafb;
+            border-top: 1px solid #e0e0e0;
+        }
+        .tool-section {
+            background: white;
+            border: 1px solid #e6e6e6;
+            border-radius: 10px;
+            padding: 12px;
+            margin-top: 12px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+        .tool-section h3 {
+            font-size: 14px;
+            margin-bottom: 10px;
+            color: #2c3e50;
+        }
+        .field-row {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-bottom: 10px;
+            font-size: 12px;
+        }
+        .field-row label {
+            font-weight: 600;
+            color: #4a4a4a;
+        }
+        .field-inline {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .field-inline input {
+            flex: 1;
+        }
+        .tool-input {
+            padding: 8px 10px;
+            border: 1px solid #d0d7de;
+            border-radius: 6px;
+            font-size: 12px;
+        }
+        .btn-small {
+            padding: 8px 10px;
+            border: none;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            background: #2196f3;
+            color: white;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .btn-small.secondary {
+            background: #2c3e50;
+        }
+        .btn-small.outline {
+            background: white;
+            border: 1px solid #d0d7de;
+            color: #2c3e50;
+        }
+        .btn-small:hover {
+            opacity: 0.9;
+        }
+        .helper-text {
+            font-size: 11px;
+            color: #6b7280;
+        }
+        .avatar-preview {
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
+            border: 1px solid #e0e0e0;
+            object-fit: cover;
+            background: #f0f2f5;
+        }
+        .api-log {
+            background: #0f172a;
+            color: #e2e8f0;
+            font-size: 11px;
+            padding: 10px;
+            border-radius: 8px;
+            max-height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
     </style>
 </head>
 <body>
@@ -403,8 +496,8 @@
         <div class="login-box">
             <h2>🚀 Connexion</h2>
             <div class="login-tabs">
-                <div class="login-tab active" onclick="switchTab('login')">Se connecter</div>
-                <div class="login-tab" onclick="switchTab('signup')">S'inscrire</div>
+                <div class="login-tab active" onclick="switchTab('login', event)">Se connecter</div>
+                <div class="login-tab" onclick="switchTab('signup', event)">S'inscrire</div>
             </div>
             <div id="login-form">
                 <div class="form-group">
@@ -445,9 +538,160 @@
                 <h2>💬 Conversations</h2>
                 <div class="user-info">
                     <div id="current-user">Non connecté</div>
+                    <div class="helper-text">Token: <span id="current-token">-</span></div>
                 </div>
             </div>
-            <div class="conversations-list" id="conversations-list">
+            <div class="sidebar-content">
+                <div class="conversations-list" id="conversations-list"></div>
+                <div class="toolbox">
+                    <div class="tool-section">
+                        <h3>🔧 Configuration API</h3>
+                        <div class="field-row">
+                            <label>URL de l'API</label>
+                            <div class="field-inline">
+                                <input class="tool-input" id="api-url" type="text" value="http://localhost:8000">
+                                <button class="btn-small secondary" onclick="applyApiUrl()">Appliquer</button>
+                            </div>
+                            <span class="helper-text">Change l'URL pour tester un autre serveur.</span>
+                        </div>
+                        <div class="field-inline">
+                            <button class="btn-small outline" onclick="reconnectWebSocket()">Reconnecter WS</button>
+                            <button class="btn-small outline" onclick="clearApiLog()">Vider le log</button>
+                        </div>
+                    </div>
+
+                    <div class="tool-section">
+                        <h3>👤 Profil</h3>
+                        <div class="field-row">
+                            <label>Nouveau nom d'utilisateur</label>
+                            <div class="field-inline">
+                                <input class="tool-input" id="update-username" type="text" placeholder="Nouveau pseudo">
+                                <button class="btn-small" onclick="changeUsername()">Mettre à jour</button>
+                            </div>
+                        </div>
+                        <div class="field-row">
+                            <label>Nouveau mail</label>
+                            <div class="field-inline">
+                                <input class="tool-input" id="update-mail" type="email" placeholder="nouveau@mail.com">
+                                <button class="btn-small" onclick="changeMail()">Mettre à jour</button>
+                            </div>
+                        </div>
+                        <div class="field-row">
+                            <label>Nouveau mot de passe</label>
+                            <div class="field-inline">
+                                <input class="tool-input" id="update-password" type="password" placeholder="••••••••">
+                                <button class="btn-small" onclick="changePassword()">Mettre à jour</button>
+                            </div>
+                        </div>
+                        <div class="field-row">
+                            <label>Nouvelle date de naissance</label>
+                            <div class="field-inline">
+                                <input class="tool-input" id="update-dob" type="date">
+                                <button class="btn-small" onclick="changeDateOfBirth()">Mettre à jour</button>
+                            </div>
+                        </div>
+                        <div class="field-row">
+                            <label>Avatar</label>
+                            <div class="field-inline">
+                                <input class="tool-input" id="avatar-file" type="file" accept="image/*">
+                                <button class="btn-small" onclick="changeAvatar()">Uploader</button>
+                            </div>
+                            <div class="field-inline">
+                                <img id="avatar-preview" class="avatar-preview" alt="Aperçu avatar">
+                                <button class="btn-small outline" onclick="loadAvatar()">Recharger</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tool-section">
+                        <h3>🔍 Utilisateurs</h3>
+                        <div class="field-row">
+                            <label>Recherche par ID</label>
+                            <div class="field-inline">
+                                <input class="tool-input" id="lookup-user-id" type="number" placeholder="ID">
+                                <button class="btn-small" onclick="getUserById()">Chercher</button>
+                            </div>
+                        </div>
+                        <div class="field-row">
+                            <label>Recherche par pseudo</label>
+                            <div class="field-inline">
+                                <input class="tool-input" id="lookup-username" type="text" placeholder="Pseudo">
+                                <button class="btn-small" onclick="getUserByUsername()">Chercher</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tool-section">
+                        <h3>🤝 Amis</h3>
+                        <div class="field-row">
+                            <label>Ajouter un ami par pseudo</label>
+                            <div class="field-inline">
+                                <input class="tool-input" id="friend-username" type="text" placeholder="Pseudo">
+                                <button class="btn-small" onclick="sendFriendRequestByUsername()">Demander</button>
+                            </div>
+                        </div>
+                        <div class="field-row">
+                            <label>Ajouter un ami par ID</label>
+                            <div class="field-inline">
+                                <input class="tool-input" id="friend-id" type="number" placeholder="ID utilisateur">
+                                <button class="btn-small" onclick="sendFriendRequestById()">Demander</button>
+                                <button class="btn-small outline" onclick="removeFriend()">Supprimer</button>
+                            </div>
+                        </div>
+                        <div class="field-row">
+                            <label>Demandes reçues (sender_id)</label>
+                            <div class="field-inline">
+                                <input class="tool-input" id="friend-request-sender" type="number" placeholder="sender_id">
+                                <button class="btn-small" onclick="acceptFriendRequest()">Accepter</button>
+                                <button class="btn-small outline" onclick="rejectFriendRequest()">Refuser</button>
+                            </div>
+                        </div>
+                        <div class="field-row">
+                            <label>Annuler une demande envoyée (receiver_id)</label>
+                            <div class="field-inline">
+                                <input class="tool-input" id="friend-request-receiver" type="number" placeholder="receiver_id">
+                                <button class="btn-small outline" onclick="cancelFriendRequest()">Annuler</button>
+                            </div>
+                        </div>
+                        <div class="field-inline">
+                            <button class="btn-small secondary" onclick="loadFriends()">Lister amis</button>
+                            <button class="btn-small secondary" onclick="loadFriendRequests()">Lister demandes</button>
+                        </div>
+                    </div>
+
+                    <div class="tool-section">
+                        <h3>💬 Conversations</h3>
+                        <div class="field-row">
+                            <label>Créer via pseudo</label>
+                            <div class="field-inline">
+                                <input class="tool-input" id="conversation-username" type="text" placeholder="Pseudo">
+                                <button class="btn-small" onclick="createConversationByUsername()">Créer</button>
+                            </div>
+                        </div>
+                        <div class="field-row">
+                            <label>Créer via ID</label>
+                            <div class="field-inline">
+                                <input class="tool-input" id="conversation-user-id" type="number" placeholder="ID utilisateur">
+                                <button class="btn-small" onclick="createConversationById()">Créer</button>
+                            </div>
+                        </div>
+                        <div class="field-row">
+                            <label>Supprimer conversation</label>
+                            <div class="field-inline">
+                                <input class="tool-input" id="conversation-id" type="number" placeholder="conversation_id">
+                                <button class="btn-small outline" onclick="deleteConversation()">Supprimer</button>
+                            </div>
+                        </div>
+                        <div class="field-inline">
+                            <button class="btn-small secondary" onclick="loadConversations()">Rafraîchir</button>
+                        </div>
+                    </div>
+
+                    <div class="tool-section">
+                        <h3>📋 Réponses API</h3>
+                        <pre class="api-log" id="api-log">Prêt.</pre>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -480,7 +724,7 @@
     </div>
 
     <script>
-        const API_URL = 'http://localhost:8000';
+        let API_URL = 'http://localhost:8000';
         let currentUser = null;
         let currentToken = null;
         let ws = null;
@@ -490,9 +734,11 @@
         let selectedFiles = [];
         let mediaPollingTimers = {};
 
-        function switchTab(tab) {
+        function switchTab(tab, event) {
             document.querySelectorAll('.login-tab').forEach(t => t.classList.remove('active'));
-            event.target.classList.add('active');
+            if (event?.target) {
+                event.target.classList.add('active');
+            }
             
             if (tab === 'login') {
                 document.getElementById('login-form').style.display = 'block';
@@ -516,13 +762,7 @@
                 const result = await response.json();
                 
                 if (result.status_code === 200) {
-                    currentUser = result;
-                    currentToken = result.api_token;
-                    document.getElementById('login-modal').style.display = 'none';
-                    document.getElementById('main-container').style.display = 'flex';
-                    document.getElementById('current-user').textContent = result.username;
-                    connectWebSocket();
-                    loadConversations();
+                    applySession(result);
                 } else {
                     alert('Erreur de connexion: ' + result.message);
                 }
@@ -546,13 +786,7 @@
                 const result = await response.json();
                 
                 if (result.status_code === 200) {
-                    currentUser = result;
-                    currentToken = result.api_token;
-                    document.getElementById('login-modal').style.display = 'none';
-                    document.getElementById('main-container').style.display = 'flex';
-                    document.getElementById('current-user').textContent = result.username;
-                    connectWebSocket();
-                    loadConversations();
+                    applySession(result);
                 } else {
                     alert('Erreur:  ' + result.message);
                 }
@@ -561,8 +795,40 @@
             }
         }
 
+        function applySession(result) {
+            currentUser = result;
+            currentToken = result.api_token;
+            document.getElementById('login-modal').style.display = 'none';
+            document.getElementById('main-container').style.display = 'flex';
+            document.getElementById('current-user').textContent = result.username;
+            document.getElementById('current-token').textContent = currentToken ? `${currentToken.slice(0, 8)}…` : '-';
+            loadAvatar();
+            connectWebSocket();
+            loadConversations();
+            logApi('Connexion OK', result);
+        }
+
+        function applyApiUrl() {
+            const input = document.getElementById('api-url');
+            if (!input.value.trim()) return;
+            API_URL = input.value.trim().replace(/\/$/, '');
+            logApi('API URL mise à jour', {api_url: API_URL});
+            reconnectWebSocket();
+        }
+
+        function getWsBaseUrl() {
+            try {
+                const api = new URL(API_URL);
+                const protocol = api.protocol === 'https:' ? 'wss:' : 'ws:';
+                return `${protocol}//${api.host}`;
+            } catch (error) {
+                return API_URL.replace('http://', 'ws://').replace('https://', 'wss://');
+            }
+        }
+
         function connectWebSocket() {
-            ws = new WebSocket(`ws://${API_URL.replace('http://', '')}/ws/${currentToken}`);
+            if (!currentToken) return;
+            ws = new WebSocket(`${getWsBaseUrl()}/ws/${currentToken}`);
 
             ws.onopen = () => {
                 document.getElementById('ws-dot').classList.add('connected');
@@ -578,6 +844,260 @@
                 document.getElementById('ws-dot').classList.remove('connected');
                 document.getElementById('ws-status').textContent = 'Déconnecté';
             };
+        }
+
+        function reconnectWebSocket() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.close();
+            }
+            connectWebSocket();
+        }
+
+        function getAuthHeaders() {
+            return currentToken ? {'Authorization': currentToken} : {};
+        }
+
+        function logApi(title, data) {
+            const log = document.getElementById('api-log');
+            const timestamp = new Date().toLocaleTimeString('fr-FR');
+            const payload = data ? JSON.stringify(data, null, 2) : '';
+            log.textContent = `[${timestamp}] ${title}\n${payload}\n\n${log.textContent}`.trim();
+        }
+
+        function clearApiLog() {
+            document.getElementById('api-log').textContent = 'Log vidé.';
+        }
+
+        async function requestJson(path, options = {}) {
+            const response = await fetch(`${API_URL}${path}`, options);
+            const result = await response.json();
+            return result;
+        }
+
+        async function changeUsername() {
+            const username = document.getElementById('update-username').value.trim();
+            if (!username) return;
+            const result = await requestJson('/me/change_username', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', ...getAuthHeaders()},
+                body: JSON.stringify({username})
+            });
+            if (result.status_code === 200) {
+                currentUser.username = result.new_username;
+                document.getElementById('current-user').textContent = result.new_username;
+            }
+            logApi('Changement username', result);
+        }
+
+        async function changeMail() {
+            const mail = document.getElementById('update-mail').value.trim();
+            if (!mail) return;
+            const result = await requestJson('/me/change_mail', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', ...getAuthHeaders()},
+                body: JSON.stringify({mail})
+            });
+            logApi('Changement mail', result);
+        }
+
+        async function changePassword() {
+            const password = document.getElementById('update-password').value;
+            if (!password) return;
+            const result = await requestJson('/me/change_password', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', ...getAuthHeaders()},
+                body: JSON.stringify({password})
+            });
+            logApi('Changement mot de passe', result);
+        }
+
+        async function changeDateOfBirth() {
+            const dateOfBirth = document.getElementById('update-dob').value;
+            if (!dateOfBirth) return;
+            const result = await requestJson('/me/change_date_of_birth', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', ...getAuthHeaders()},
+                body: JSON.stringify({date_of_birth: dateOfBirth})
+            });
+            logApi('Changement date de naissance', result);
+        }
+
+        async function changeAvatar() {
+            const fileInput = document.getElementById('avatar-file');
+            const file = fileInput.files[0];
+            if (!file) return;
+            const formData = new FormData();
+            formData.append('file', file);
+            const result = await requestJson('/me/change_avatar', {
+                method: 'POST',
+                headers: {...getAuthHeaders()},
+                body: formData
+            });
+            if (result.status_code === 200) {
+                currentUser.avatar_id = result.avatar_id;
+                loadAvatar();
+            }
+            logApi('Changement avatar', result);
+        }
+
+        async function loadAvatar() {
+            if (!currentUser?.avatar_id || !currentToken) return;
+            try {
+                const response = await fetch(`${API_URL}/media/avatar?avatar_id=${currentUser.avatar_id}`, {
+                    headers: {...getAuthHeaders()}
+                });
+                if (!response.ok) {
+                    logApi('Chargement avatar', {status: response.status});
+                    return;
+                }
+                const blob = await response.blob();
+                document.getElementById('avatar-preview').src = URL.createObjectURL(blob);
+            } catch (error) {
+                logApi('Erreur avatar', {error: error.toString()});
+            }
+        }
+
+        async function getUserById() {
+            const userId = document.getElementById('lookup-user-id').value;
+            if (!userId) return;
+            const result = await requestJson(`/user?user_id=${userId}`, {
+                headers: {...getAuthHeaders()}
+            });
+            logApi(`Recherche utilisateur ID ${userId}`, result);
+            return result;
+        }
+
+        async function getUserByUsername() {
+            const username = document.getElementById('lookup-username').value.trim();
+            if (!username) return;
+            const result = await requestJson(`/user/username?username=${encodeURIComponent(username)}`, {
+                headers: {...getAuthHeaders()}
+            });
+            logApi(`Recherche utilisateur ${username}`, result);
+            return result;
+        }
+
+        async function sendFriendRequestByUsername() {
+            const username = document.getElementById('friend-username').value.trim();
+            if (!username) return;
+            const user = await requestJson(`/user/username?username=${encodeURIComponent(username)}`, {
+                headers: {...getAuthHeaders()}
+            });
+            if (user.status_code !== 200) {
+                logApi('Recherche ami', user);
+                return;
+            }
+            document.getElementById('friend-id').value = user.user_id;
+            await sendFriendRequestById();
+        }
+
+        async function sendFriendRequestById() {
+            const receiverId = Number(document.getElementById('friend-id').value);
+            if (!receiverId) return;
+            const result = await requestJson('/me/send_friend_request', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', ...getAuthHeaders()},
+                body: JSON.stringify({receiver_id: receiverId})
+            });
+            logApi('Demande d\'ami', result);
+        }
+
+        async function removeFriend() {
+            const friendId = Number(document.getElementById('friend-id').value);
+            if (!friendId) return;
+            const result = await requestJson('/me/remove_friend', {
+                method: 'DELETE',
+                headers: {'Content-Type': 'application/json', ...getAuthHeaders()},
+                body: JSON.stringify({friend_id: friendId})
+            });
+            logApi('Suppression ami', result);
+        }
+
+        async function loadFriends() {
+            const result = await requestJson('/me/friends', {
+                headers: {...getAuthHeaders()}
+            });
+            logApi('Liste amis', result);
+        }
+
+        async function loadFriendRequests() {
+            const result = await requestJson('/me/friend_requests', {
+                headers: {...getAuthHeaders()}
+            });
+            logApi('Demandes d\'amis', result);
+        }
+
+        async function acceptFriendRequest() {
+            const senderId = Number(document.getElementById('friend-request-sender').value);
+            if (!senderId) return;
+            const result = await requestJson('/me/accept_friend_request', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', ...getAuthHeaders()},
+                body: JSON.stringify({sender_id: senderId})
+            });
+            logApi('Acceptation demande', result);
+        }
+
+        async function rejectFriendRequest() {
+            const senderId = Number(document.getElementById('friend-request-sender').value);
+            if (!senderId) return;
+            const result = await requestJson('/me/reject_friend_request', {
+                method: 'DELETE',
+                headers: {'Content-Type': 'application/json', ...getAuthHeaders()},
+                body: JSON.stringify({sender_id: senderId})
+            });
+            logApi('Refus demande', result);
+        }
+
+        async function cancelFriendRequest() {
+            const receiverId = Number(document.getElementById('friend-request-receiver').value);
+            if (!receiverId) return;
+            const result = await requestJson('/me/cancel_friend_request', {
+                method: 'DELETE',
+                headers: {'Content-Type': 'application/json', ...getAuthHeaders()},
+                body: JSON.stringify({receiver_id: receiverId})
+            });
+            logApi('Annulation demande', result);
+        }
+
+        async function createConversationByUsername() {
+            const username = document.getElementById('conversation-username').value.trim();
+            if (!username) return;
+            const user = await requestJson(`/user/username?username=${encodeURIComponent(username)}`, {
+                headers: {...getAuthHeaders()}
+            });
+            if (user.status_code !== 200) {
+                logApi('Recherche utilisateur pour conversation', user);
+                return;
+            }
+            document.getElementById('conversation-user-id').value = user.user_id;
+            await createConversationById();
+        }
+
+        async function createConversationById() {
+            const user2Id = Number(document.getElementById('conversation-user-id').value);
+            if (!user2Id) return;
+            const result = await requestJson('/create_conversation', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', ...getAuthHeaders()},
+                body: JSON.stringify({user2_id: user2Id})
+            });
+            logApi('Création conversation', result);
+            if (result.status_code === 200) {
+                loadConversations();
+            }
+        }
+
+        async function deleteConversation() {
+            const conversationId = Number(document.getElementById('conversation-id').value);
+            if (!conversationId) return;
+            const result = await requestJson('/delete_conversation', {
+                method: 'DELETE',
+                headers: {'Content-Type': 'application/json', ...getAuthHeaders()},
+                body: JSON.stringify({conversation_id: conversationId})
+            });
+            logApi('Suppression conversation', result);
+            loadConversations();
         }
 
         function handleWebSocketMessage(data) {

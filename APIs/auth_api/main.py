@@ -19,7 +19,8 @@ class AuthAPI:
         self.login()
 
     def signup(self):
-        @self.app.post("/signup", tags=["Authentication"])
+        @self.app.post("/signup", tags=["Authentication"],
+                       description="Create a new user account.")
         def root(data: SignUpDatas):
             if not data.username or  not data.mail or not data.password:
                 return {
@@ -49,7 +50,8 @@ class AuthAPI:
             }
         
     def login(self):
-        @self.app.post("/login", tags=["Authentication"])
+        @self.app.post("/login", tags=["Authentication"], 
+                       description="Login to an existing user account.")
         def root(data: LoginDatas):
             if not data.mail or not data.password:
                 return {
@@ -72,7 +74,8 @@ class AuthAPI:
                     "username": user.get("username"),
                     "mail": user.get("mail"),
                     "date_of_birth": user.get("date_of_birth"),
-                    "api_token": user.get("api_token")
+                    "api_token": user.get("api_token"),
+                    "avatar_id": user.get("avatar_id")
                 }
             else:
                 return {"status_code": 401, "message": "User or password invalid."}
