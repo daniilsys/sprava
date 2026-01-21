@@ -125,7 +125,7 @@ class UserAPI:
         @self.app.post("/me/change_username", tags=["User Info"], description="Change your username.")
         def root(data: UserUpdateDatas, authorization: str = Header(None)):
             user = self._get_user_from_token(authorization)
-            username = data.get("username")
+            username = data.username
 
             user.set("username", username)
             user.save()
@@ -155,7 +155,7 @@ class UserAPI:
         @self.app.post("/me/change_date_of_birth", tags=["User Info"], description="Change your date of birth.")
         def root(data: UserUpdateDatas, authorization: str = Header(None)):
             user = self._get_user_from_token(authorization)
-            date_of_birth = data.get("date_of_birth")
+            date_of_birth = data.date_of_birth
             user.set("date_of_birth", date_of_birth)
             user.save()
             return {
@@ -168,7 +168,7 @@ class UserAPI:
     def change_mail(self):
         @self.app.post("/me/change_mail", tags=["User Info"], description="Change your email address.")
         def root(data: UserUpdateDatas, authorization: str = Header(None)):
-            mail = data.get("mail")
+            mail = data.mail
             user = self._get_user_from_token(authorization)
             user.set("mail", mail)
             user.save()

@@ -39,9 +39,16 @@ class MediaAPI:
 
             media_dir = Path("media/avatars")
             file_path = media_dir / avatar_id
-            print(file_path)
+
+            
             if not file_path.exists():
-                raise HTTPException(status_code=404, detail="Avatar not found")
+                avatar_suffix = Path(avatar_id).suffix
+                if not avatar_suffix:
+                    matches = list(media_dir.glob(f"{avatar_id}.*"))
+                    if matches:
+                        file_path = matches[0]
+                    else:
+                        raise HTTPException(status_code=404, detail="Avatar not found")
 
             return FileResponse(file_path)
         
