@@ -239,7 +239,7 @@ class UserAPI:
             friends = relationship.get_friends()
             if data.friend_id not in friends: 
                 return {
-                    "status_code": 400,
+                    "status_code": 404,
                     "message": "You are not friends with this user."
                 }
 

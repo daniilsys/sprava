@@ -84,7 +84,7 @@ class UserManager:
         self.data["dirty"] = False
 
     def get(self, key: str):
-        return self.data[key]
+        return self.data[key] if key in self.data else None
 
     def set(self, key: str, value: any):
         self.data[key] = value
