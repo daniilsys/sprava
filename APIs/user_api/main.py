@@ -258,6 +258,7 @@ class UserAPI:
             user = self._get_user_from_token(authorization)
 
             relationship = self.app.relationships_cache.cache[user.user_id]["requests"]
+            print(relationship.get_received_requests())
             return {
                 "status_code": 200,
                 "friend_requests_ids": relationship.get_received_requests()

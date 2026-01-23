@@ -71,20 +71,21 @@ class WebSocketHandlers:
         conversation_id = data.get("conversation_id")
         if not conversation_id:
             return
-
+        conn, cursor = self.app.get_cursor()
         conversation_manager = self.app.conversations_cache.cache[sender_id]
         conversation_manager.mark_as_read(conversation_id)
 
-        self.app.cursor.execute("""
+        cursor.execute("""
         SELECT user1_id, user2_id
         FROM conversations
         WHERE id = %s
         """, (conversation_id,))
 
-        result = self.app.cursor.fetchone()
+        result = cursor.fetchone()
         if not result:
             return
-
+        conn.close()
+        cursor.close()
         other_user_id = result['user2_id'] if result['user1_id'] == sender_id else result['user1_id']
 
         mark_read_data = {
