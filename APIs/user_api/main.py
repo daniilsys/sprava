@@ -26,6 +26,7 @@ class UserAPI:
     def __init__(self, app):
         self.app = app
         self.get_user()
+        self.get_me()
         self.get_user_batch()
         self.get_user_from_username()
         
@@ -57,6 +58,20 @@ class UserAPI:
             raise HTTPException(status_code=401, detail="No user found with this token")
         
         return user
+    
+
+    def get_me(self):
+        @self.app.get("/me", tags=["User Info"], description="Retrieve your user information.")
+        def root(authorization: str = Header(None)):
+            user = self._get_user_from_token(authorization)
+            return {
+                "status_code": 200,
+                "user_id": user.user_id,
+                "username": user.get("username"),
+                "mail": user.get("mail"),
+                "date_of_birth": user.get("date_of_birth"),
+                "avatar_id": user.get("avatar_id")
+            }
     
     def get_user(self):
         @self.app.get("/user", tags=["User Info"], description="Retrieve user information by user ID.")
