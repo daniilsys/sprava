@@ -83,7 +83,7 @@ class UserAPI:
             self._get_user_from_token(authorization)
 
             for user in self.app.users_cache.cache.values():
-                if user.get("username") == username:
+                if user.get("username").lower() == username.lower():
                     return {
                         "status_code": 200,
                         "user_id": user.user_id,
@@ -258,7 +258,6 @@ class UserAPI:
             user = self._get_user_from_token(authorization)
 
             relationship = self.app.relationships_cache.cache[user.user_id]["requests"]
-            print(relationship.get_received_requests())
             return {
                 "status_code": 200,
                 "friend_requests_ids": relationship.get_received_requests()

@@ -1,5 +1,3 @@
-# websocket_manager.py
-
 class ConnectionManager:
     def __init__(self):
         self.active_connections = {}

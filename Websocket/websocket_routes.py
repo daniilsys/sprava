@@ -38,6 +38,5 @@ class WebsocketRoutes:
             await self.handlers.notify_status_change(user_id, "offline")
 
         except Exception as e:
-            print(f"Websocket error for user {user_id}: {e}")
             self.manager.disconnect(websocket, user_id)
             await self.handlers.notify_status_change(user_id, "offline")
