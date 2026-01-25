@@ -20,6 +20,7 @@
 
 | Method | Path | Purpose | Auth | Request | Success response | Error response |
 | --- | --- | --- | --- | --- | --- | --- |
+| GET | `/me` | Get information about me | Yes | - | `{status_code: 200, user_id, username, mail, date_of_birth, api_token, avatar_id }` | `{ status_code: 401, message }` |
 | GET | `/user` | Get user by id | Yes | Query: `user_id` | `200` body: `{ status_code: 200, user_id, username, mail, date_of_birth, avatar_id }` | `404` body: `{ status_code: 404, message }` |
 | GET | `/user/username` | Get user by username | Yes | Query: `username` | `200` body: `{ status_code: 200, user_id, username, mail, date_of_birth, avatar_id }` | `404` body: `{ status_code: 404, message }` |
 | POST | `/user/batch` | Get user info for multiple ids | Yes | JSON: `{ user_id: [int, ...] }` | `200` body: `{ status_code: 200, users: [ { user_id, username, mail, date_of_birth, avatar_id }, ... ] }` | — |
