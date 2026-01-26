@@ -138,7 +138,7 @@ class ConversationManager:
                     m.is_read
                 FROM messages m
                 WHERE m.conversation_id = %s
-                ORDER BY m.created_at ASC
+                ORDER BY m.created_at DESC
                 LIMIT %s OFFSET %s
             """, (conversation_id, limit, offset))
 
@@ -154,7 +154,7 @@ class ConversationManager:
                 SELECT message_id, id
                 FROM media
                 WHERE message_id IN ({placeholders})
-                ORDER BY id ASC
+                ORDER BY id DESC
             """, message_ids)
             
             media_results = cursor.fetchall()
