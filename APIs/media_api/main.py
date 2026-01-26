@@ -10,6 +10,7 @@ class MediaAPI:
         self.get_media()
         self.get_avatar()
         self.get_message_media()
+        self.get_media_download()
         self.upload_media()
 
     def _get_user_from_token(self, authorization):
