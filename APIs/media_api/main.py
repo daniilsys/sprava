@@ -25,8 +25,8 @@ class MediaAPI:
 
     def get_media(self):
         @self.app.get("/media/", tags=["Media"], description="Retrieve a media informations by its ID.")
-        def root(media_id: int):
-            self._get_user_from_token(authorization=None)
+        def root(media_id: int, authorization: str = Header(None)):
+            self._get_user_from_token(authorization=authorization)
             media_info = self.app.medias.get_media_info(media_id)
             if not media_info:
                 raise HTTPException(status_code=404, detail="Media not found")
