@@ -93,11 +93,16 @@ class ConversationManager:
                     (SELECT COUNT(*) FROM messages 
                      WHERE conversation_id = c.id 
                      AND sender_id != %s 
-                     AND is_read = FALSE) AS unread_count
+                     AND is_read = FALSE) AS unread_count,
+                    (SELECT username FROM users 
+                     WHERE id = CASE
+                           WHEN c.user1_id = %s THEN c.user2_id 
+                         ELSE c.user1_id 
+                     END) AS other_username
                 FROM conversations c
                 WHERE c.user1_id = %s OR c.user2_id = %s
                 ORDER BY last_message_at DESC
-            """, (self.user_id, self.user_id, self.user_id, self.user_id))
+            """, (self.user_id, self.user_id, self.user_id, self.user_id, self.user_id, self.user_id))
 
             return cursor.fetchall()
         finally:

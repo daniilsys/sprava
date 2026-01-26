@@ -37,11 +37,14 @@ class MediaAPI:
     def get_media_download(self):
         @self.app.get("/media/download/", tags=["Media"], description="Download a media file by its ID.")
         def root(media_id: int):
+            media_info = self.app.medias.get_media_info(media_id)
+            if not media_info:
+                raise HTTPException(status_code=404, detail="Media not found")
             media_path = self.app.medias.get_file(media_id)
             if not media_path:
                 raise HTTPException(status_code=404, detail="Media not found")
 
-            return FileResponse(media_path)
+            return FileResponse(media_path, filename=media_info['filename'])
         
     def get_avatar(self):
         @self.app.get("/media/avatar", tags=["Media"], description="Retrieve a user's avatar by its ID.")
