@@ -71,7 +71,8 @@
 
 | Method | Path | Purpose | Auth | Request | Success response | Error response |
 | --- | --- | --- | --- | --- | --- | --- |
-| GET | `/media/` | Download media by id | No (header accepted but not validated) | Query: `media_id` | `200` file response | `404` HTTP error |
+| GET | `/media/download` | Download a media by its id | No | Query: `media_id` | File response | Error 404
+| GET | `/media/` | Retrieve informations about a media by its id| No (header accepted but not validated) | Query: `media_id` | `200` file response | `404` HTTP error |
 | GET | `/media/avatar` | Download avatar | Yes | Query: `avatar_id` | `200` file response | `404` HTTP error |
 | GET | `/media/message/` | List media ids for message | Yes | Query: `message_id` | `200` body: `[media_id, ...]` | `404` HTTP error |
 | POST | `/media/upload` | Upload message media | Yes | Query: `message_id`, Multipart: `file` | `200` body: result from `MediaDatabase.create_media` | — |

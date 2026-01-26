@@ -23,6 +23,25 @@ class MediaDatabase:
             cursor.close()
             conn.close()
 
+    def get_media_info(self, media_id):
+        conn, cursor = self.app.get_cursor()
+        try:
+            cursor.execute("SELECT id, filename, file_size, message_id FROM media WHERE id = %s", (media_id,))
+            result = cursor.fetchone()
+            if not result:
+                return None
+            
+            media_info = {
+                "id": result["id"],
+                "filename": result["filename"],
+                "file_size": result["file_size"],
+                "message_id": result["message_id"]
+            }
+            return media_info
+        finally:
+            cursor.close()
+            conn.close()
+
     def get_file(self, media_id):
         conn, cursor = self.app.get_cursor()
         try:
