@@ -102,7 +102,7 @@ class ConversationManager:
                 FROM conversations c
                 WHERE c.user1_id = %s OR c.user2_id = %s
                 ORDER BY last_message_at DESC
-            """, (self.user_id, self.user_id, self.user_id, self.user_id, self.user_id, self.user_id))
+            """, (self.user_id, self.user_id, self.user_id, self.user_id, self.user_id))
 
             return cursor.fetchall()
         finally:
@@ -123,7 +123,7 @@ class ConversationManager:
             conn.close()
 
     def get_messages(self, conversation_id, limit=50, offset=0):
-        conn, cursor = self.cache. app.get_cursor()
+        conn, cursor = self.cache.app.get_cursor()
         try:
             cursor.execute("""
                 SELECT * FROM conversations 
