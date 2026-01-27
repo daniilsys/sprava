@@ -174,7 +174,7 @@ class FriendRequestsManager:
         conn, cursor = self.cache.app.get_cursor()
         try:
             cursor.execute("""
-                SELECT sender_id, created_at 
+                SELECT sender_id, created_at
                 FROM friends_requests 
                 WHERE receiver_id = %s
             """, (self.user_id,))

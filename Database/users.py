@@ -87,7 +87,7 @@ class UserManager:
         self.data["dirty"] = False
 
     def get(self, key: str):
-        return self.data[key] if key in self.data else None
+        return self.data.get(key, None)
 
     def set(self, key: str, value: any):
         self.data[key] = value
@@ -111,11 +111,11 @@ class UserManager:
             """, (
                 self.data["username"],
                 self.data["mail"],
-                self.data["phone"],
+                self.data.get("phone", None),
                 self.data["password_hash"],
                 self.data["date_of_birth"],
                 self.data["api_token"],
-                self.data["avatar_id"],
+                self.data.get("avatar_id", None),
                 self.user_id
             ))
             self.data["dirty"] = False

@@ -81,14 +81,18 @@ class ConversationsAPI:
     def delete_conversation(self):
         @self.app.delete("/delete_conversation", tags=["Conversations"], 
                         description="Delete a conversation.")
-        def root(data: ConversationRequestDatas, authorization: str = Header(None)):
+        async def root(data: ConversationRequestDatas, authorization: str = Header(None)):
             user = self._get_user_from_token(authorization)
             
             conversation_manager = self.app.conversations_cache.cache[user.user_id]
             conversation_manager.delete_conversation(data.conversation_id)
+            await self.app.websocket_managers.send_personal_message(data.conversation_id, {
+                "type": "conversation_deleted",
+                "conversation_id": data.conversation_id
+            })
             return {
                 "status_code": 200,
-                "message": "Conversation deletion not yet implemented."
+                "message": "Conversation deleted successfully."
             }
 
     def get_conversations(self):
