@@ -45,6 +45,7 @@ class AuthAPI:
                 "user_id": created_user.user_id,
                 "username": created_user.get("username"),
                 "mail": created_user.get("mail"),
+                "phone": created_user.get("phone"),
                 "date_of_birth": created_user.get("date_of_birth"),
                 "api_token": created_user.get("api_token")
             }
@@ -73,6 +74,7 @@ class AuthAPI:
                     "user_id": user.user_id,
                     "username": user.get("username"),
                     "mail": user.get("mail"),
+                    "phone": user.get("phone"),
                     "date_of_birth": user.get("date_of_birth"),
                     "api_token": user.get("api_token"),
                     "avatar_id": user.get("avatar_id")

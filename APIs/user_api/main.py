@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from fastapi import HTTPException, Header, UploadFile, File
-from typing import Optional
+from typing import Optional, Literal
 import bcrypt
 from pathlib import Path
 import uuid
@@ -22,6 +22,27 @@ class UserUpdateDatas(BaseModel):
     date_of_birth: Optional[str] = None
     password: Optional[str] = None
 
+Visibility = Literal['nobody', 'friends', 'everyone']
+
+class UserProfileUpdateDatas(BaseModel):
+    bio: Optional[str] = None
+    location: Optional[str] = None
+    website: Optional[str] = None
+    share_location: Optional[Visibility] = None
+    share_mail: Optional[Visibility] = None
+    share_phone: Optional[Visibility] = None
+    share_date_of_birth: Optional[Visibility] = None
+
+class UserProfileInfoDatas(BaseModel):
+    user_id: int
+    bio: Optional[str] = None
+    location: Optional[str] = None
+    website: Optional[str] = None
+    share_location: Visibility
+    share_mail: Visibility
+    share_phone: Visibility
+    share_date_of_birth: Visibility
+
 class UserAPI:
     def __init__(self, app):
         self.app = app
@@ -35,6 +56,9 @@ class UserAPI:
         self.change_date_of_birth()
         self.change_mail()
         self.change_avatar()
+
+        self.get_user_profile()
+        self.update_user_profile()
 
         self.get_friends()
         self.remove_friend()
@@ -59,16 +83,25 @@ class UserAPI:
         
         return user
     
+    def _can_see(self, visibility: str, viewer_is_friend: bool) -> bool:
+            if visibility == "everyone":
+                return True
+            if visibility == "friends":
+                return viewer_is_friend
+            return False
+    
 
     def get_me(self):
         @self.app.get("/me", tags=["User Info"], description="Retrieve your user information.")
         def root(authorization: str = Header(None)):
             user = self._get_user_from_token(authorization)
+            user_profile = self.app.users_profile_cache.get_or_create(user.user_id)
             return {
                 "status_code": 200,
                 "user_id": user.user_id,
                 "username": user.get("username"),
                 "mail": user.get("mail"),
+                "phone": user.get("phone"),
                 "date_of_birth": user.get("date_of_birth"),
                 "avatar_id": user.get("avatar_id")
             }
@@ -84,14 +117,19 @@ class UserAPI:
                     "message": "The given user_id is not related to any users."
                 }
             user = self.app.users_cache.cache[user_id]
+            are_friends = self.app.relationships_cache.are_friends(user.user_id, user_id)
+            user_profile = self.app.users_profile_cache.get_or_create(user.user_id)
+            is_self = user.user_id == user_id
             return {
                 "status_code": 200,
                 "user_id": user.user_id,
                 "username": user.get("username"),
-                "mail": user.get("mail"),
-                "date_of_birth": user.get("date_of_birth"),
+                "mail": user.get("mail") if (is_self or self._can_see(user_profile.get("share_mail"), are_friends)) else None,
+                "phone": user.get("phone") if (is_self or self._can_see(user_profile.get("share_phone"), are_friends)) else None,
+                "date_of_birth": user.get("date_of_birth") if (is_self or self._can_see(user_profile.get("share_date_of_birth"), are_friends)) else None,
                 "avatar_id": user.get("avatar_id")
             }
+        
     def get_user_from_username(self):
         @self.app.get("/user/username", tags=["User Info"], description="Retrieve user information by username.")
         def root(username: str, authorization: str = Header(None)):
@@ -99,12 +137,16 @@ class UserAPI:
 
             for user in self.app.users_cache.cache.values():
                 if user.get("username").lower() == username.lower():
+                    user_profile = self.app.users_profile_cache.get_or_create(user.user_id)
+                    are_friends = self.app.relationships_cache.are_friends(user.user_id, user.user_id)
+                    is_self = user.user_id == user.user_id
                     return {
                         "status_code": 200,
                         "user_id": user.user_id,
                         "username": user.get("username"),
-                        "mail": user.get("mail"),
-                        "date_of_birth": user.get("date_of_birth"),
+                        "mail": user.get("mail") if (is_self or self._can_see(user_profile.get("share_mail"), are_friends)) else None,
+                        "phone": user.get("phone") if (is_self or self._can_see(user_profile.get("share_phone"), are_friends)) else None,
+                        "date_of_birth": user.get("date_of_birth") if (is_self or self._can_see(user_profile.get("share_date_of_birth"), are_friends)) else None,
                         "avatar_id": user.get("avatar_id")
                     }
             return {
@@ -122,11 +164,15 @@ class UserAPI:
             for uid in user_ids:
                 if uid in self.app.users_cache.cache:
                     user = self.app.users_cache.cache[uid]
+                    user_profile = self.app.users_profile_cache.get_or_create(user.user_id)
+                    are_friends = self.app.relationships_cache.are_friends(user.user_id, uid)
+                    is_self = user.user_id == uid
                     users_info.append({
                         "user_id": user.user_id,
                         "username": user.get("username"),
-                        "mail": user.get("mail"),
-                        "date_of_birth": user.get("date_of_birth"),
+                        "mail": user.get("mail") if (is_self or self._can_see(user_profile.get("share_mail"), are_friends)) else None,
+                        "phone": user.get("phone") if (is_self or self._can_see(user_profile.get("share_phone"), are_friends)) else None,
+                        "date_of_birth": user.get("date_of_birth") if (is_self or self._can_see(user_profile.get("share_date_of_birth"), are_friends)) else None,
                         "avatar_id": user.get("avatar_id")
                     })
 
@@ -134,7 +180,60 @@ class UserAPI:
                 "status_code":  200,
                 "users":  users_info
             }
+    
+    def get_user_profile(self):
         
+        @self.app.get("/user/profile", tags=["User Profile"], description="Retrieve user profile information by user ID.")
+        def root(user_id: int, authorization: str = Header(None)):
+            requester = self._get_user_from_token(authorization)
+
+            if user_id not in self.app.users_cache.cache:
+                raise HTTPException(status_code=404, detail="User not found")
+
+            if self.app.relationships_cache.are_blocked(user_id, requester.user_id):
+                raise HTTPException(status_code=403, detail="You are blocked by this user.")
+
+            user = self.app.users_cache.cache[user_id]
+            profile = self.app.users_profile_cache.get_or_create(user_id)
+
+            is_self = requester.user_id == user_id
+            are_friends = self.app.relationships_cache.are_friends(requester.user_id, user_id)
+
+            share_location = profile.get("share_location") or "nobody"
+            share_phone = profile.get("share_phone") or "nobody"
+            share_mail = profile.get("share_mail") or "nobody"
+            share_dob = profile.get("share_date_of_birth") or "nobody"
+
+            return {
+                "status_code": 200,
+                "user_id": user_id,
+                "bio": profile.get("bio"),
+                "website": profile.get("website"),
+
+                "location": profile.get("location") if (is_self or self._can_see(share_location, are_friends)) else None,
+                "phone": user.get("phone") if (is_self or self._can_see(share_phone, are_friends)) else None,
+                "mail": user.get("mail") if (is_self or self._can_see(share_mail, are_friends)) else None,
+                "date_of_birth": user.get("date_of_birth") if (is_self or self._can_see(share_dob, are_friends)) else None,
+            }
+    
+    def get_me_profile(self):
+        @self.app.get("/me/profile", tags=["User Profile"], description="Retrieve your user profile information.")
+        def root(authorization: str = Header(None)):
+            user = self._get_user_from_token(authorization)
+            profile = self.app.users_profile_cache.get_or_create(user.user_id)
+
+            return {
+                "status_code": 200,
+                "user_id": user.user_id,
+                "bio": profile.get("bio"),
+                "location": profile.get("location"),
+                "website": profile.get("website"),
+                "share_location": profile.get("share_location") or "nobody",
+                "share_mail": profile.get("share_mail") or "nobody",
+                "share_phone": profile.get("share_phone") or "nobody",
+                "share_date_of_birth": profile.get("share_date_of_birth") or "nobody"
+            }
+            
 
     def change_username(self):
         @self.app.post("/me/change_username", tags=["User Info"], description="Change your username.")
@@ -225,7 +324,35 @@ class UserAPI:
                 "user_id": user.user_id,
                 "avatar_id": id
             }
-        
+    
+    def update_user_profile(self):
+        @self.app.post("/me/update_profile", tags=["User Profile"], description="Update your user profile.")
+        def root(data: UserProfileUpdateDatas, authorization: str = Header(None)):
+            user = self._get_user_from_token(authorization)
+            profile = self.app.users_profile_cache.get_or_create(user.user_id)
+
+            if data.bio is not None:
+                profile.set("bio", data.bio)
+            if data.location is not None:
+                profile.set("location", data.location)
+            if data.website is not None:
+                profile.set("website", data.website)
+            if data.share_location is not None:
+                profile.set("share_location", data.share_location)
+            if data.share_mail is not None:
+                profile.set("share_mail", data.share_mail)
+            if data.share_phone is not None:
+                profile.set("share_phone", data.share_phone)
+            if data.share_date_of_birth is not None:
+                profile.set("share_date_of_birth", data.share_date_of_birth)
+
+            profile.save()
+
+            return {
+                "status_code": 200,
+                "message": "User profile updated.",
+                "user_id": user.user_id
+            }
 
     def get_friends(self):
         @self.app.get("/me/friends", tags=["Friends"], description="Retrieve a list of your friend's user IDs.")
@@ -359,7 +486,7 @@ class UserAPI:
             user = self._get_user_from_token(authorization)
 
             relationship_requests = self.app.relationships_cache.cache[user.user_id]["requests"]
-
+            
             if data.sender_id not in self.app.users_cache.cache:
                 return {
                     "status_code":  404,

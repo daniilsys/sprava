@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .auth_api.main import AuthAPI
 from Database.users import UsersCache
 from .user_api.main import UserAPI
+from Database.users_profile import UsersProfileCache
 from Database.relationships import RelationshipsCache
 from .conversation_api.main import ConversationsAPI
 from Database.conversations import ConversationsCache
@@ -24,6 +25,7 @@ app.db_pool = pool
 app.get_cursor = get_cursor
 
 app.users_cache = UsersCache(app).init_table()
+app.users_profile_cache = UsersProfileCache(app).init_table()
 app.relationships_cache = RelationshipsCache(app).init_table()
 app.conversations_cache = ConversationsCache(app).init_table()
 app.medias = MediaDatabase(app).init_table()

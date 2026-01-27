@@ -14,6 +14,7 @@ class UsersCache:
                 id INT PRIMARY KEY AUTO_INCREMENT,
                 username VARCHAR(255) NOT NULL,
                 mail VARCHAR(255) NOT NULL UNIQUE,
+                phone VARCHAR(20) UNIQUE,
                 password_hash VARCHAR(255) NOT NULL,
                 date_of_birth VARCHAR(10),
                 avatar_id VARCHAR(255),
@@ -29,19 +30,21 @@ class UsersCache:
             cursor.close()
             conn.close()
 
+
     def create_user(self, data: dict):
         api_token = secrets.token_hex(32)
         data["api_token"] = api_token
         conn, cursor = self.app.get_cursor()
         try:
             cursor.execute(
-            "INSERT INTO users (username, mail, password_hash, date_of_birth, api_token) VALUES (%s, %s, %s, %s, %s);",
-            (data["username"], data["mail"], data["password_hash"], data["date_of_birth"], api_token)
+            "INSERT INTO users (username, mail, phone, password_hash, date_of_birth, api_token) VALUES (%s, %s, %s, %s, %s, %s);",
+            (data["username"], data["mail"], data.get("phone", None), data["password_hash"], data["date_of_birth"], api_token)
             )
             user_id = cursor.lastrowid
             self.cache[user_id] = UserManager(user_id, data, self)
             self.app.conversations_cache.init_table()
             self.app.relationships_cache.init_table()
+            self.app.users_profile_cache.init_table()
             return self.cache[user_id]
         finally: 
             cursor.close()
@@ -99,6 +102,7 @@ class UserManager:
                 UPDATE users
                 SET username=%s,
                     mail=%s,
+                    phone=%s,
                     password_hash=%s,
                     date_of_birth=%s,
                     api_token=%s,
@@ -107,6 +111,7 @@ class UserManager:
             """, (
                 self.data["username"],
                 self.data["mail"],
+                self.data["phone"],
                 self.data["password_hash"],
                 self.data["date_of_birth"],
                 self.data["api_token"],
