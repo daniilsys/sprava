@@ -58,6 +58,7 @@ class UserAPI:
         self.change_avatar()
 
         self.get_user_profile()
+        self.get_me_profile()
         self.update_user_profile()
 
         self.get_friends()
@@ -182,7 +183,6 @@ class UserAPI:
             }
     
     def get_user_profile(self):
-        
         @self.app.get("/user/profile", tags=["User Profile"], description="Retrieve user profile information by user ID.")
         def root(user_id: int, authorization: str = Header(None)):
             requester = self._get_user_from_token(authorization)
