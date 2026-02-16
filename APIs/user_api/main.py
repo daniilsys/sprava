@@ -66,6 +66,7 @@ class UserAPI:
 
         self.get_friend_requests()
         self.send_friend_request()
+        self.get_sent_friend_requests
         self.accept_friend_request()
         self.reject_friend_request()
         self.cancel_friend_request()
@@ -74,7 +75,7 @@ class UserAPI:
         self.block_user()
         self.unblock_user()
 
-    def _get_user_from_token(self, authorization):
+    def ___get_user_from_token(self, authorization):
         if not authorization:
             raise HTTPException(status_code=401, detail="No authorization header given")
         
@@ -84,7 +85,7 @@ class UserAPI:
         
         return user
     
-    def _can_see(self, visibility: str, viewer_is_friend: bool) -> bool:
+    def __can_see(self, visibility: str, viewer_is_friend: bool) -> bool:
             if visibility == "everyone":
                 return True
             if visibility == "friends":
@@ -95,7 +96,7 @@ class UserAPI:
     def get_me(self):
         @self.app.get("/me", tags=["User Info"], description="Retrieve your user information.")
         def root(authorization: str = Header(None)):
-            user = self._get_user_from_token(authorization)
+            user = self.___get_user_from_token(authorization)
             user_profile = self.app.users_profile_cache.get_or_create(user.user_id)
             return {
                 "status_code": 200,
@@ -110,7 +111,7 @@ class UserAPI:
     def get_user(self):
         @self.app.get("/user", tags=["User Info"], description="Retrieve user information by user ID.")
         def root(user_id:  int, authorization: str = Header(None)):
-            self._get_user_from_token(authorization)
+            self.___get_user_from_token(authorization)
             
             if user_id not in self.app.users_cache.cache:
                 return {
@@ -134,7 +135,7 @@ class UserAPI:
     def get_user_from_username(self):
         @self.app.get("/user/username", tags=["User Info"], description="Retrieve user information by username.")
         def root(username: str, authorization: str = Header(None)):
-            self._get_user_from_token(authorization)
+            self.__get_user_from_token(authorization)
 
             for user in self.app.users_cache.cache.values():
                 if user.get("username").lower() == username.lower():
@@ -157,7 +158,7 @@ class UserAPI:
     def get_user_batch(self):
         @self.app.post("/user/batch", tags=["User Info"], description="Retrieve user information for a batch of user IDs.")
         def root(data: UserBatchInfoDatas, authorization: str = Header(None)):
-            self._get_user_from_token(authorization)
+            self.__get_user_from_token(authorization)
 
             user_ids = data.user_id
             users_info = []
@@ -185,7 +186,7 @@ class UserAPI:
     def get_user_profile(self):
         @self.app.get("/user/profile", tags=["User Profile"], description="Retrieve user profile information by user ID.")
         def root(user_id: int, authorization: str = Header(None)):
-            requester = self._get_user_from_token(authorization)
+            requester = self.__get_user_from_token(authorization)
 
             if user_id not in self.app.users_cache.cache:
                 raise HTTPException(status_code=404, detail="User not found")
@@ -219,7 +220,7 @@ class UserAPI:
     def get_me_profile(self):
         @self.app.get("/me/profile", tags=["User Profile"], description="Retrieve your user profile information.")
         def root(authorization: str = Header(None)):
-            user = self._get_user_from_token(authorization)
+            user = self.__get_user_from_token(authorization)
             profile = self.app.users_profile_cache.get_or_create(user.user_id)
 
             return {
@@ -238,7 +239,7 @@ class UserAPI:
     def change_username(self):
         @self.app.post("/me/change_username", tags=["User Info"], description="Change your username.")
         def root(data: UserUpdateDatas, authorization: str = Header(None)):
-            user = self._get_user_from_token(authorization)
+            user = self.__get_user_from_token(authorization)
             username = data.username
 
             user.set("username", username)
@@ -252,7 +253,7 @@ class UserAPI:
     def change_password(self):
         @self.app.post("/me/change_password", tags=["User Info"], description="Change your password.")
         def root(data: UserUpdateDatas, authorization: str = Header(None)):
-            user = self._get_user_from_token(authorization)
+            user = self.__get_user_from_token(authorization)
             password_hash = bcrypt.hashpw(
                 data.password.encode("utf-8"),
                 bcrypt.gensalt()
@@ -268,7 +269,7 @@ class UserAPI:
     def change_date_of_birth(self):
         @self.app.post("/me/change_date_of_birth", tags=["User Info"], description="Change your date of birth.")
         def root(data: UserUpdateDatas, authorization: str = Header(None)):
-            user = self._get_user_from_token(authorization)
+            user = self.__get_user_from_token(authorization)
             date_of_birth = data.date_of_birth
             user.set("date_of_birth", date_of_birth)
             user.save()
@@ -283,7 +284,7 @@ class UserAPI:
         @self.app.post("/me/change_mail", tags=["User Info"], description="Change your email address.")
         def root(data: UserUpdateDatas, authorization: str = Header(None)):
             mail = data.mail
-            user = self._get_user_from_token(authorization)
+            user = self.__get_user_from_token(authorization)
             user.set("mail", mail)
             user.save()
             return {
@@ -296,7 +297,7 @@ class UserAPI:
     def change_avatar(self):
         @self.app.post("/me/change_avatar", tags=["User Info"], description="Change your avatar.")
         async def root(file: UploadFile = File(...), authorization: str = Header(None)):
-            user = self._get_user_from_token(authorization)
+            user = self.__get_user_from_token(authorization)
             ext = Path(file.filename).suffix
             if ext.lower() not in [".jpg", ".jpeg", ".png", ".gif"]:
                 return {
@@ -328,7 +329,7 @@ class UserAPI:
     def update_user_profile(self):
         @self.app.post("/me/update_profile", tags=["User Profile"], description="Update your user profile.")
         def root(data: UserProfileUpdateDatas, authorization: str = Header(None)):
-            user = self._get_user_from_token(authorization)
+            user = self.__get_user_from_token(authorization)
             profile = self.app.users_profile_cache.get_or_create(user.user_id)
 
             if data.bio is not None:
@@ -357,7 +358,7 @@ class UserAPI:
     def get_friends(self):
         @self.app.get("/me/friends", tags=["Friends"], description="Retrieve a list of your friend's user IDs.")
         def root(authorization:  str = Header(None)):
-            user = self._get_user_from_token(authorization)
+            user = self.__get_user_from_token(authorization)
 
             relationship = self.app.relationships_cache.cache[user.user_id]["friends"]
             return {
@@ -368,7 +369,7 @@ class UserAPI:
     def remove_friend(self):
         @self.app.delete("/me/remove_friend", tags=["Friends"], description="Remove a friend from your friends list.")
         def root(data: FriendRequestDatas, authorization: str = Header(None)):
-            user = self._get_user_from_token(authorization)
+            user = self.__get_user_from_token(authorization)
 
             relationship = self.app.relationships_cache.cache[user.user_id]["friends"]
 
@@ -397,18 +398,29 @@ class UserAPI:
     def get_friend_requests(self):
         @self.app.get("/me/friend_requests", tags=["Friends Requests"], description="Retrieve a list of your received friend request IDs.")
         def root(authorization: str = Header(None)):
-            user = self._get_user_from_token(authorization)
+            user = self.__get_user_from_token(authorization)
 
             relationship = self.app.relationships_cache.cache[user.user_id]["requests"]
             return {
                 "status_code": 200,
                 "friend_requests_ids": relationship.get_received_requests()
             }
+    def get_sent_friend_requests(self):
+        @self.app.get("/me/sent_friend_requests", tags=["Friends Requests"], description="Retrieve a list of your sent friend request IDs.")
+        def root(authorization: str = Header(None)):
+            user = self.__get_user_from_token(authorization)
+
+            relationship = self.app.relationships_cache.cache[user.user_id]["requests"]
+            return {
+                "status_code": 200,
+                "sent_friend_requests_ids": relationship.get_sent_requests()
+            }
+        
 
     def send_friend_request(self):
         @self.app.post("/me/send_friend_request", tags=["Friends Requests"], description="Send a friend request to another user.")
         async def root(data: FriendRequestDatas, authorization: str = Header(None)):
-            user = self._get_user_from_token(authorization)
+            user = self.__get_user_from_token(authorization)
 
             relationship = self.app.relationships_cache.cache[user.user_id]["requests"]
 
@@ -455,7 +467,7 @@ class UserAPI:
     def cancel_friend_request(self):
         @self.app.delete("/me/cancel_friend_request", tags=["Friends Requests"], description="Cancel a sent friend request.")
         def root(data: FriendRequestDatas, authorization: str = Header(None)):
-            user = self._get_user_from_token(authorization)
+            user = self.__get_user_from_token(authorization)
 
             relationship = self.app.relationships_cache.cache[user.user_id]["requests"]
 
@@ -483,7 +495,7 @@ class UserAPI:
     def accept_friend_request(self):
         @self.app.post("/me/accept_friend_request", tags=["Friends Requests"], description="Accept a received friend request.")
         async def root(data: FriendRequestDatas, authorization: str = Header(None)):
-            user = self._get_user_from_token(authorization)
+            user = self.__get_user_from_token(authorization)
 
             relationship_requests = self.app.relationships_cache.cache[user.user_id]["requests"]
             
@@ -516,7 +528,7 @@ class UserAPI:
     def reject_friend_request(self):
         @self.app.delete("/me/reject_friend_request", tags=["Friends Requests"], description="Reject a received friend request.")
         def root(data: FriendRequestDatas, authorization:  str = Header(None)):
-            user = self._get_user_from_token(authorization)
+            user = self.__get_user_from_token(authorization)
 
             relationship_requests = self.app.relationships_cache.cache[user.user_id]["requests"]
 
@@ -544,7 +556,7 @@ class UserAPI:
     def get_blocked_users(self):
         @self.app.get("/me/blocked_users", tags=["Blocked Users"], description="Retrieve a list of your blocked user IDs.")
         def root(authorization: str = Header(None)):
-            user = self._get_user_from_token(authorization)
+            user = self.__get_user_from_token(authorization)
 
             relationship_blocked = self.app.relationships_cache.cache[user.user_id]["blocked"]
             return {
@@ -555,7 +567,7 @@ class UserAPI:
     def block_user(self):
         @self.app.post("/me/block_user", tags=["Blocked Users"], description="Block a user.")
         def root(data: FriendRequestDatas, authorization: str = Header(None)):
-            user = self._get_user_from_token(authorization)
+            user = self.__get_user_from_token(authorization)
 
             relationship_blocked = self.app.relationships_cache.cache[user.user_id]["blocked"]
             
@@ -577,7 +589,7 @@ class UserAPI:
     def unblock_user(self):
         @self.app.delete("/me/unblock_user", tags=["Blocked Users"], description="Unblock a user.")
         def root(data:  FriendRequestDatas, authorization: str = Header(None)):
-            user = self._get_user_from_token(authorization)
+            user = self.__get_user_from_token(authorization)
 
             relationship_blocked = self.app.relationships_cache.cache[user.user_id]["blocked"]
 

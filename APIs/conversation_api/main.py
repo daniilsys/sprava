@@ -33,7 +33,7 @@ class ConversationsAPI:
         self.conversation_delete_message()
         self.conversation_read()
 
-    def _get_user_from_token(self, authorization):
+    def ___get_user_from_token(self, authorization):
         if not authorization:
             raise HTTPException(status_code=401, detail="No authorization header given")
         
@@ -47,7 +47,7 @@ class ConversationsAPI:
         @self.app.post("/create_conversation", tags=["Conversations"],
                        description="Create a new conversation with a friend.")
         async def root(data: ConversationCreationDatas, authorization: str = Header(None)):
-            user = self._get_user_from_token(authorization)
+            user = self.__get_user_from_token(authorization)
             
             if data.user2_id not in self.app.users_cache.cache:
                 return {
@@ -82,7 +82,7 @@ class ConversationsAPI:
         @self.app.delete("/delete_conversation", tags=["Conversations"], 
                         description="Delete a conversation.")
         async def root(data: ConversationRequestDatas, authorization: str = Header(None)):
-            user = self._get_user_from_token(authorization)
+            user = self.__get_user_from_token(authorization)
             
             conversation_manager = self.app.conversations_cache.cache[user.user_id]
             conversation_manager.delete_conversation(data.conversation_id)
@@ -99,7 +99,7 @@ class ConversationsAPI:
         @self.app.get("/me/conversations", tags=["Conversations"],
                       description="Retrieve a list of your conversations with informations about it, such as last message, unread messages, etc.")
         def root(authorization: str = Header(None)):
-            user = self._get_user_from_token(authorization)
+            user = self.__get_user_from_token(authorization)
             
             conversation_manager = self.app.conversations_cache.cache[user.user_id]
             conversations = conversation_manager.get_conversations()
@@ -112,7 +112,7 @@ class ConversationsAPI:
         @self.app.get("/conversation/messages", tags=["Conversations"], 
                       description="Retrieve messages from a specific conversation.")
         def root(conversation_id: int, limit: int = 50, offset:  int = 0, authorization: str = Header(None)):
-            user = self._get_user_from_token(authorization)
+            user = self.__get_user_from_token(authorization)
             
             conversation_manager = self.app.conversations_cache.cache[user.user_id]
             messages = conversation_manager.get_messages(conversation_id, limit, offset)
@@ -125,7 +125,7 @@ class ConversationsAPI:
     def conversation_send_message(self):
         @self.app.post("/conversation/send_message", tags=["Conversations"], description="Send a message in a specific conversation.")
         async def root(data: ConversationMessageSendDatas, authorization:  str = Header(None)):
-            user = self._get_user_from_token(authorization)
+            user = self.__get_user_from_token(authorization)
             conversation_manager = self.app.conversations_cache.cache[user.user_id]
             other_user_id = conversation_manager.get_other_user_id(data.conversation_id)
 
@@ -157,7 +157,7 @@ class ConversationsAPI:
     def conversation_delete_message(self):
         @self.app.delete("/conversation/delete_message", tags=["Conversations"], description="Delete a message you have sent in a conversation.")
         async def root(data: ConversationMessageDeleteDatas, authorization: str = Header(None)):
-            user = self._get_user_from_token(authorization)
+            user = self.__get_user_from_token(authorization)
             
             conversation_manager = self.app.conversations_cache.cache[user.user_id]
             sender_id = conversation_manager.get_sender_id(data.message_id)
@@ -188,7 +188,7 @@ class ConversationsAPI:
     def conversation_read(self):
         @self.app.put("/conversation/read", tags=["Conversations"], description="Mark messages as read in a specific conversation.")
         async def root(data: ConversationRequestDatas, authorization: str = Header(None)):
-            user = self._get_user_from_token(authorization)
+            user = self.__get_user_from_token(authorization)
             
             conversation_manager = self.app.conversations_cache.cache[user.user_id]
             conversation_manager.mark_as_read(data.conversation_id)

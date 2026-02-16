@@ -13,7 +13,7 @@ class MediaAPI:
         self.get_media_download()
         self.upload_media()
 
-    def _get_user_from_token(self, authorization):
+    def __get_user_from_token(self, authorization):
         if not authorization:
             raise HTTPException(status_code=401, detail="No authorization header given")
         
@@ -27,7 +27,7 @@ class MediaAPI:
     def get_media(self):
         @self.app.get("/media/", tags=["Media"], description="Retrieve a media informations by its ID.")
         def root(media_id: int, authorization: str = Header(None)):
-            self._get_user_from_token(authorization=authorization)
+            self.__get_user_from_token(authorization=authorization)
             media_info = self.app.medias.get_media_info(media_id)
             if not media_info:
                 raise HTTPException(status_code=404, detail="Media not found")
@@ -49,7 +49,7 @@ class MediaAPI:
     def get_avatar(self):
         @self.app.get("/media/avatar", tags=["Media"], description="Retrieve a user's avatar by its ID.")
         def root(avatar_id: str, authorization: str = Header(None)):
-            self._get_user_from_token(authorization)
+            self.__get_user_from_token(authorization)
 
             media_dir = Path("media/avatars")
             file_path = media_dir / avatar_id
@@ -69,7 +69,7 @@ class MediaAPI:
     def get_message_media(self):
         @self.app.get("/media/message/", tags=["Media"], description="Retrieve all media IDs associated with a specific message.")
         def root(message_id: int, authorization: str = Header(None)):
-            self._get_user_from_token(authorization)
+            self.__get_user_from_token(authorization)
 
             media_ids = self.app.medias.get_all_media_ids_for_message(message_id)
             if not media_ids:
@@ -80,7 +80,7 @@ class MediaAPI:
     def upload_media(self):
         @self.app.post("/media/upload", tags=["Media"], description="Upload a media file associated with a specific message.")
         async def root(message_id: int, file: UploadFile = File(...), authorization: str = Header(None)):
-            self._get_user_from_token(authorization)
+            self.__get_user_from_token(authorization)
 
             result = await self.app.medias.create_media(message_id, file)
             return result
