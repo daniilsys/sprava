@@ -66,7 +66,7 @@ class UserAPI:
 
         self.get_friend_requests()
         self.send_friend_request()
-        self.get_sent_friend_requests
+        self.get_sent_friend_requests()
         self.accept_friend_request()
         self.reject_friend_request()
         self.cancel_friend_request()
