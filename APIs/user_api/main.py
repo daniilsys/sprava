@@ -85,12 +85,6 @@ class UserAPI:
         
         return user
     
-    def __can_see(self, visibility: str, viewer_is_friend: bool) -> bool:
-            if visibility == "everyone":
-                return True
-            if visibility == "friends":
-                return viewer_is_friend
-            return False
     
 
     def get_me(self):
