@@ -33,7 +33,7 @@ class ConversationsAPI:
         self.conversation_delete_message()
         self.conversation_read()
 
-    def ___get_user_from_token(self, authorization):
+    def __get_user_from_token(self, authorization):
         if not authorization:
             raise HTTPException(status_code=401, detail="No authorization header given")
         

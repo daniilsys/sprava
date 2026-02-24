@@ -75,7 +75,7 @@ class UserAPI:
         self.block_user()
         self.unblock_user()
 
-    def ___get_user_from_token(self, authorization):
+    def __get_user_from_token(self, authorization):
         if not authorization:
             raise HTTPException(status_code=401, detail="No authorization header given")
         
@@ -90,7 +90,7 @@ class UserAPI:
     def get_me(self):
         @self.app.get("/me", tags=["User Info"], description="Retrieve your user information.")
         def root(authorization: str = Header(None)):
-            user = self.___get_user_from_token(authorization)
+            user = self.__get_user_from_token(authorization)
             user_profile = self.app.users_profile_cache.get_or_create(user.user_id)
             return {
                 "status_code": 200,
@@ -105,7 +105,7 @@ class UserAPI:
     def get_user(self):
         @self.app.get("/user", tags=["User Info"], description="Retrieve user information by user ID.")
         def root(user_id:  int, authorization: str = Header(None)):
-            self.___get_user_from_token(authorization)
+            self.__get_user_from_token(authorization)
             
             if user_id not in self.app.users_cache.cache:
                 return {
