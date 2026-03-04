@@ -11,7 +11,7 @@ export async function sendVerificationEmail(
   to: string,
   token: string,
 ): Promise<void> {
-  const url = `${process.env.APP_URL}/api/auth/verify-email?token=${token}`;
+  const url = `${process.env.APP_URL}/auth/verify-email?token=${token}`;
 
   await sgMail.send({
     to,
@@ -68,7 +68,7 @@ export async function sendPasswordResetEmail(
   to: string,
   token: string,
 ): Promise<void> {
-  const url = `${process.env.APP_URL}/api/auth/reset-password?token=${token}`;
+  const url = `${process.env.APP_URL}/auth/reset-password?token=${token}`;
 
   await sgMail.send({
     to,

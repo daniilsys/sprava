@@ -23,14 +23,14 @@ app.use(express.json());
 app.set("trust proxy", 1);
 app.use(globalLimiter);
 
-app.use("/api/auth", authRoutes);
-app.use("/api/servers", serverRoutes);
-app.use("/api/channels", channelRoutes);
-app.use("/api/friendships", friendshipRoutes);
-app.use("/api/messages", messageRoutes);
-app.use("/api/dm", dmRoutes);
-app.use("/api/users", userRoutes);
-app.use("/api/settings", settingsRoutes);
-app.use("/api/uploads", uploadsRoutes);
+app.use("/auth", authRoutes);
+app.use("/servers", serverRoutes);
+app.use("/channels", channelRoutes);
+app.use("/friendships", friendshipRoutes);
+app.use("/messages", messageRoutes);
+app.use("/dm", dmRoutes);
+app.use("/users", userRoutes);
+app.use("/settings", settingsRoutes);
+app.use("/uploads", uploadsRoutes);
 
 app.use(errorMiddleware);
