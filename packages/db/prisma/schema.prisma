@@ -1,0 +1,362 @@
+generator client {
+  provider = "prisma-client"
+  output = "../src/generated/prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Auth ───────────────────────────────────────────
+
+model User {
+  id           String   @id
+  username     String   @unique
+  email        String   @unique
+  passwordHash String
+  avatar       String?
+
+
+  verified     Boolean  @default(false)
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+
+  profile               UserProfile?
+  settings              UserSettings?
+  members               ServerMember[]
+  bans                  ServerBan[]
+  messages              Message[]
+  memberRoles           MemberRole[]
+  channelRules          ChannelRule[]
+  sentFriendships       Friendship[]        @relation("SentFriendships")
+  receivedFriendships   Friendship[]        @relation("ReceivedFriendships")
+  dmParticipants        DmParticipant[]
+  refreshTokens         RefreshToken[]
+  emailVerifications    EmailVerification[]
+  passwordResets        PasswordReset[]
+  readStates            ReadState[]
+}
+
+model RefreshToken {
+  id        String   @id
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model EmailVerification {
+  id        String   @id
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model PasswordReset {
+  id        String   @id
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model UserProfile {
+  userId    String   @unique 
+  bio       String?
+  location  String?
+  website   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model UserSettings {
+  userId      String   @unique
+  theme       Theme   @default(DARK)
+  
+  language    Language   @default(en)
+
+  showLocation PrivacyLevel @default(FRIENDS_ONLY)
+  showActivity PrivacyLevel @default(FRIENDS_ONLY)
+  showStatus   PrivacyLevel @default(FRIENDS_ONLY)
+  showEmail    PrivacyLevel @default(NOBODY)
+  showWebsite  PrivacyLevel @default(PUBLIC)
+
+  dmPrivacy     DMPrivacyLevel @default(COMMON_SERVER)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum PrivacyLevel {
+  PUBLIC
+  FRIENDS_ONLY
+  NOBODY
+}
+
+enum Theme {
+  LIGHT
+  DARK
+  SYSTEM
+}
+
+enum DMPrivacyLevel {
+  COMMON_SERVER
+  FRIENDS_ONLY
+}
+
+enum Language {
+  en
+  fr
+}
+
+// ─── Amis ───────────────────────────────────────────
+
+model Friendship {
+  id         String           @id
+  senderId   String
+  receiverId String
+  status     FriendshipStatus @default(PENDING)
+  createdAt  DateTime         @default(now())
+
+  sender   User @relation("SentFriendships", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver User @relation("ReceivedFriendships", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@unique([senderId, receiverId])
+  @@index([receiverId])
+}
+
+enum FriendshipStatus {
+  PENDING
+  ACCEPTED
+  BLOCKED
+}
+
+// ─── Serveurs ───────────────────────────────────────
+
+model Server {
+  id          String   @id 
+  name        String
+  description String?
+  icon        String?
+  inviteCode  String   @unique @default(cuid())
+  ownerId     String
+  createdAt   DateTime @default(now())
+
+  members  ServerMember[]
+  channels Channel[]
+  roles    Role[]
+  bans     ServerBan[]
+}
+
+model ServerMember {
+  userId   String
+  serverId String
+  joinedAt DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  server Server @relation(fields: [serverId], references: [id], onDelete: Cascade)
+
+  @@id([userId, serverId])
+  @@index([serverId])
+}
+
+model ServerBan {
+  userId   String
+  serverId String
+  reason   String?
+  bannedAt DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  server Server @relation(fields: [serverId], references: [id], onDelete: Cascade)
+
+  @@id([userId, serverId])
+}
+
+// ─── Rôles ──────────────────────────────────────────
+
+model Role {
+  id          String   @id
+  name        String
+  color       String?
+  serverId    String
+  permissions BigInt   @default(0)
+  position    Int      @default(0)
+
+  server  Server     @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  channelRules ChannelRule[]
+  members MemberRole[]
+}
+
+model MemberRole {
+  memberId String  // userId
+  roleId   String
+
+  member User @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  role   Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([memberId, roleId])
+  @@index([roleId])
+}
+
+// ─── Channels ───────────────────────────────────────
+
+model Channel {
+  id       String      @id
+  name     String
+  type     ChannelType @default(TEXT)
+  position Int         @default(0)
+  serverId String
+
+  server   Server    @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  rules    ChannelRule[]
+  messages Message[]
+  readStates ReadState[]
+
+  @@index([serverId]) 
+}
+
+model ChannelRule {
+  id        String  @id
+  channelId String
+  roleId    String?
+  memberId  String?
+  allow     BigInt  @default(0)
+  deny      BigInt  @default(0)
+
+  channel Channel       @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  role    Role?         @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  member  User?         @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([channelId, roleId])
+  @@unique([channelId, memberId])
+}
+
+enum ChannelType {
+  TEXT
+  VOICE
+  ANNOUNCEMENT
+  PARENT
+}
+
+// ─── DMs ────────────────────────────────────────────
+
+model DmConversation {
+  id        String   @id 
+  createdAt DateTime @default(now())
+  type      DmConversationType @default(PRIVATE)
+
+  // GROUP DM
+  name String?
+  icon String?
+  ownerId String?
+
+  participants DmParticipant[]
+  messages     Message[]
+}
+
+model DmParticipant {
+  userId           String
+  dmConversationId String
+
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dmConversation DmConversation @relation(fields: [dmConversationId], references: [id], onDelete: Cascade)
+
+  @@id([userId, dmConversationId])
+  @@index([dmConversationId])
+}
+
+enum DmConversationType {
+  PRIVATE
+  GROUP
+}
+
+// ─── Messages ───────────────────────────────────────
+
+model Message {
+  id        String      @id
+  content   String     
+  type      MessageType @default(TEXT)
+  authorId  String
+  editedAt  DateTime?
+  deletedAt DateTime?   // soft delete
+  createdAt DateTime    @default(now())
+
+  channelId        String?
+  dmConversationId String?
+
+  replyToId String?
+
+  author         User            @relation(fields: [authorId], references: [id])
+  channel        Channel?        @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  dmConversation DmConversation? @relation(fields: [dmConversationId], references: [id], onDelete: Cascade)
+  replyTo        Message?        @relation("MessageReplies", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies        Message[]       @relation("MessageReplies")
+
+  attachments Attachment[]
+  reactions   Reaction[]
+
+  @@index([channelId, createdAt(sort: Desc)])        
+  @@index([dmConversationId, createdAt(sort: Desc)])  
+  @@index([authorId])                                  
+}
+
+enum MessageType {
+  TEXT
+  SYSTEM   // "X a rejoint le serveur"
+}
+
+model Attachment {
+  id        String @id
+  url       String
+  filename  String
+  size      Int
+  mimeType  String
+  messageId String
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
+}
+
+model Reaction {
+  id        String @id
+  emoji     String
+  userId    String
+  messageId String
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, messageId, emoji])
+  @@index([messageId]) 
+}
+
+// ─── Read State ─────────────────────────────────────
+
+model ReadState {
+  id               String   @id
+  userId           String
+  channelId        String?
+  dmConversationId String?
+  lastReadMessageId String
+  updatedAt        DateTime @updatedAt
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channel       Channel?  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, channelId])
+  @@unique([userId, dmConversationId])
+}
