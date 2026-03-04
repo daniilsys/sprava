@@ -1,0 +1,9 @@
+node_modules/
+.DS_Store
+target/
+dist/
+.env
+.vscode/
+generated/
+CLAUDE.md
+.claude/
