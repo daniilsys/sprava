@@ -1,6 +1,7 @@
 import Redis from "ioredis";
 import type { Server } from "socket.io";
 import { redis } from "../config/redis.js";
+import { logger } from "../config/logger.js";
 import type { VoiceNotification } from "./voice.redis.js";
 
 /**
@@ -11,7 +12,7 @@ export function startVoiceNotifySubscriber(io: Server): void {
   const sub = new Redis(process.env.REDIS_URL ?? "redis://localhost:6379");
 
   sub.subscribe("voice:notify", (err) => {
-    if (err) console.error("[voice:notify] subscribe error:", err);
+    if (err) logger.error({ err }, "voice:notify subscribe error");
   });
 
   sub.on("message", async (_, msg) => {

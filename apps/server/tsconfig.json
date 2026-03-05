@@ -5,5 +5,7 @@
     "moduleResolution": "bundler",
     "rootDir": "src",
     "outDir": "dist"
-  }
+  },
+
+  "exclude": ["vitest.config.ts", "dist", "__tests__"]
 }

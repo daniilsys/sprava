@@ -1,4 +1,5 @@
 import express from "express";
+import helmet from "helmet";
 import { errorMiddleware } from "./middlewares/error.middleware.js";
 import { globalLimiter } from "./middlewares/rateLimiter.middleware.js";
 
@@ -19,9 +20,14 @@ app.set("json replacer", (_key: string, value: unknown) =>
   typeof value === "bigint" ? value.toString() : value,
 );
 
+app.use(helmet());
 app.use(express.json());
 app.set("trust proxy", 1);
 app.use(globalLimiter);
+
+app.get("/health", (_req, res) => {
+  res.json({ status: "ok" });
+});
 
 app.use("/auth", authRoutes);
 app.use("/servers", serverRoutes);

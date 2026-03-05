@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from "express";
 import { AppError } from "../utils/AppError";
 import { ZodError, z } from "zod";
 import { Prisma } from "@sprava/db";
+import { logger } from "../config/logger.js";
 
 export const errorMiddleware = (
   err: unknown,
@@ -37,7 +38,7 @@ export const errorMiddleware = (
   }
 
   // Unknown errors
-  console.error("Unexpected error:", err);
+  logger.error({ err }, "Unexpected error");
   return res.status(500).json({
     code: "INTERNAL_ERROR",
     message: "Internal server error",

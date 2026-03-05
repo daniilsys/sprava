@@ -15,6 +15,7 @@ import {
   sendVerificationEmail,
   sendPasswordResetEmail,
 } from "../../config/email.js";
+import { logger } from "../../config/logger.js";
 
 const ACCESS_SECRET = process.env.JWT_SECRET!;
 const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET!;
@@ -71,7 +72,7 @@ export class AuthService {
     });
 
     this.sendVerification(user.id, user.email).catch((e) => {
-      console.error("Failed to send verification email:", e);
+      logger.error({ err: e, userId: user.id }, "Failed to send verification email");
     });
 
     return {
