@@ -3,6 +3,7 @@ import type { Server } from "socket.io";
 import { redis } from "../config/redis.js";
 import { logger } from "../config/logger.js";
 import type { VoiceNotification } from "./voice.redis.js";
+import { startDmAloneTimer, clearDmAloneTimer } from "./voice.handlers.js";
 
 /**
  * Starts the voice:notify subscriber once at boot.
@@ -54,9 +55,12 @@ export function startVoiceNotifySubscriber(io: Server): void {
           `voice:room:${notif.roomId}:members`,
         );
         if (remaining === 0) {
+          clearDmAloneTimer(notif.roomId);
           io.to(`dm:${dmConversationId}`).emit("voice:dm_call_ended", {
             dmConversationId,
           });
+        } else if (remaining === 1) {
+          startDmAloneTimer(io, notif.roomId);
         }
       }
     }

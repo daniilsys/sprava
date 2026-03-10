@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { handleConnectTransport } from "../../src/handlers/connect.js";
 import { publishResponse } from "../../src/redis/publisher.js";
-import { userTransports } from "../../src/state.js";
-import { mockTransport } from "../setup.js";
+import { transports } from "../../src/state.js";
+import { mockSendTransport } from "../setup.js";
 import type { VoiceCommand } from "../../src/redis/subscriber.js";
 
 vi.mock("../../src/redis/publisher.js", () => ({
@@ -17,21 +17,21 @@ const makeCmd = (overrides?: Partial<VoiceCommand>): VoiceCommand => ({
   type: "CONNECT_TRANSPORT",
   roomId: "channel:ch1",
   userId: "user-1",
-  payload: { transportId: "transport-1", dtlsParameters: dtlsParams },
+  payload: { transportId: mockSendTransport.id, dtlsParameters: dtlsParams },
   ...overrides,
 });
 
 describe("handleConnectTransport", () => {
   beforeEach(() => {
-    userTransports.clear();
+    transports.clear();
   });
 
   it("connects the transport with DTLS parameters", async () => {
-    userTransports.set("user-1", mockTransport as any);
+    transports.set(mockSendTransport.id, mockSendTransport as any);
 
     await handleConnectTransport(makeCmd());
 
-    expect(mockTransport.connect).toHaveBeenCalledWith({
+    expect(mockSendTransport.connect).toHaveBeenCalledWith({
       dtlsParameters: dtlsParams,
     });
     expect(publishResponse).toHaveBeenCalledWith("req-2", {
@@ -50,8 +50,8 @@ describe("handleConnectTransport", () => {
   });
 
   it("responds with error on connect failure", async () => {
-    userTransports.set("user-1", mockTransport as any);
-    mockTransport.connect.mockRejectedValueOnce(new Error("DTLS failed"));
+    transports.set(mockSendTransport.id, mockSendTransport as any);
+    mockSendTransport.connect.mockRejectedValueOnce(new Error("DTLS failed"));
 
     await handleConnectTransport(makeCmd());
 

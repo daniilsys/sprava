@@ -97,6 +97,8 @@ export function makeRole(overrides: Record<string, unknown> = {}) {
     serverId: "server-1",
     permissions: 0n,
     position: 0,
+    isWorld: false,
+    separate: false,
     createdAt: new Date("2026-01-15"),
     updatedAt: new Date("2026-01-15"),
     ...overrides,

@@ -20,6 +20,7 @@ export const sendMessageSchema = z
   .object({
     content: z.string().max(2000).optional(),
     attachments: z.array(attachmentItemSchema).max(10).optional(),
+    replyToId: z.string().optional(),
   })
   .refine(
     (d) =>

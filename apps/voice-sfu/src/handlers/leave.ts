@@ -2,7 +2,8 @@ import type { VoiceCommand } from "../redis/subscriber.js";
 import { publishResponse, publishNotification } from "../redis/publisher.js";
 import { destroyRoom } from "../mediasoup/rooms.js";
 import {
-  userTransports,
+  transports,
+  userTransportIds,
   userProducers,
   userConsumers,
   userRooms,
@@ -27,12 +28,13 @@ export async function handleLeave(cmd: VoiceCommand): Promise<void> {
     }
     userProducers.delete(userId);
 
-    // Close and remove transport
-    const transport = userTransports.get(userId);
-    if (transport) {
-      transport.close();
-      userTransports.delete(userId);
+    // Close and remove all transports
+    const tIds = userTransportIds.get(userId) ?? [];
+    for (const id of tIds) {
+      const t = transports.get(id);
+      if (t) { t.close(); transports.delete(id); }
     }
+    userTransportIds.delete(userId);
 
     userRooms.delete(userId);
 
@@ -44,14 +46,11 @@ export async function handleLeave(cmd: VoiceCommand): Promise<void> {
     });
 
     // Destroy the room if it's now empty
-    if (roomMap && roomMap.size === 0) {
-      // Count remaining users (those still in userRooms pointing to this room)
-      const roomUsers = Array.from(userRooms.values()).filter(
-        (r) => r === roomId,
-      );
-      if (roomUsers.length === 0) {
-        destroyRoom(roomId);
-      }
+    const roomUsers = Array.from(userRooms.values()).filter(
+      (r) => r === roomId,
+    );
+    if (roomUsers.length === 0) {
+      destroyRoom(roomId);
     }
 
     await publishResponse(requestId, { ok: true, payload: {} });

@@ -12,6 +12,7 @@ import dmRoutes from "./modules/dm/dm.routes.js";
 import userRoutes from "./modules/users/users.routes.js";
 import settingsRoutes from "./modules/settings/settings.routes.js";
 import uploadsRoutes from "./modules/uploads/uploads.routes.js";
+import pinsRoutes from "./modules/pins/pins.routes.js";
 
 export const app = express();
 
@@ -38,5 +39,6 @@ app.use("/dm", dmRoutes);
 app.use("/users", userRoutes);
 app.use("/settings", settingsRoutes);
 app.use("/uploads", uploadsRoutes);
+app.use("/", pinsRoutes);
 
 app.use(errorMiddleware);

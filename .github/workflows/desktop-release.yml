@@ -1,0 +1,133 @@
+name: Desktop Release
+
+on:
+  push:
+    tags:
+      - "desktop-v*"
+
+env:
+  TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+  TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            args: --target aarch64-apple-darwin
+            rust_target: aarch64-apple-darwin
+          - platform: macos-latest
+            args: --target x86_64-apple-darwin
+            rust_target: x86_64-apple-darwin
+          - platform: ubuntu-22.04
+            args: ""
+            rust_target: ""
+          - platform: windows-latest
+            args: ""
+            rust_target: ""
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: apps/desktop/sprava-v2/pnpm-lock.yaml
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_target }}
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/sprava-v2/src-tauri -> target
+
+      # Linux: install system dependencies
+      - name: Install Linux dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libasound2-dev
+
+      - name: Install frontend dependencies
+        working-directory: apps/desktop/sprava-v2
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SPRAVA_API_URL: ${{ vars.SPRAVA_API_URL }}
+          VITE_SOCKET_URL: ${{ vars.VITE_SOCKET_URL }}
+          VITE_HCAPTCHA_SITEKEY: ${{ vars.VITE_HCAPTCHA_SITEKEY }}
+        with:
+          projectPath: apps/desktop/sprava-v2
+          tauriScript: pnpm tauri
+          args: ${{ matrix.args }}
+          tagName: ${{ github.ref_name }}
+          releaseName: "Sprava ${{ github.ref_name }}"
+          releaseBody: "See the assets below to download and install."
+          releaseDraft: false
+          prerelease: false
+
+  # Publish update artifacts to the public releases repo
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download latest.json from release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release download "${{ github.ref_name }}" \
+            --repo "${{ github.repository }}" \
+            --pattern "latest.json" \
+            --dir ./artifacts
+
+      - name: Download all update bundles from release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Download platform-specific update bundles (.tar.gz, .zip, .nsis.zip, .AppImage.tar.gz, .sig)
+          gh release download "${{ github.ref_name }}" \
+            --repo "${{ github.repository }}" \
+            --pattern "*.sig" \
+            --pattern "*.tar.gz" \
+            --pattern "*.zip" \
+            --pattern "*.AppImage*" \
+            --pattern "*.dmg" \
+            --pattern "*.deb" \
+            --pattern "*.msi" \
+            --pattern "*.exe" \
+            --dir ./artifacts || true
+
+      - name: Publish to public releases repo
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_REPO_TOKEN }}
+        run: |
+          # Create or update the release on the public repo
+          TAG="${{ github.ref_name }}"
+          PUBLIC_REPO="${{ vars.RELEASES_REPO }}"
+
+          # Delete existing release if any
+          gh release delete "$TAG" --repo "$PUBLIC_REPO" --yes 2>/dev/null || true
+
+          # Create new release and upload all artifacts
+          gh release create "$TAG" \
+            --repo "$PUBLIC_REPO" \
+            --title "Sprava $TAG" \
+            --notes "See the assets below to download and install." \
+            ./artifacts/*

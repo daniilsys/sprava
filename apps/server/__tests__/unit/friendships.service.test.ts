@@ -243,30 +243,44 @@ describe("FriendshipsService", () => {
   // ── List queries ──────────────────────────────────────────────────────────
 
   describe("getFriends", () => {
-    it("should return friends with correct friendId mapping", async () => {
+    it("should return friends with sender/receiver mapping", async () => {
       vi.mocked(prisma.friendship.findMany).mockResolvedValue([
-        makeFriendship({ senderId: "user-1", receiverId: "user-2", status: "ACCEPTED" }),
-        makeFriendship({ senderId: "user-3", receiverId: "user-1", status: "ACCEPTED" }),
+        {
+          ...makeFriendship({ senderId: "user-1", receiverId: "user-2", status: "ACCEPTED" }),
+          sender: { id: "user-1", username: "user1", avatar: null },
+          receiver: { id: "user-2", username: "user2", avatar: null },
+        },
+        {
+          ...makeFriendship({ senderId: "user-3", receiverId: "user-1", status: "ACCEPTED" }),
+          sender: { id: "user-3", username: "user3", avatar: null },
+          receiver: { id: "user-1", username: "user1", avatar: null },
+        },
       ] as any);
 
       const result = await service.getFriends("user-1");
 
       expect(result).toHaveLength(2);
-      expect(result[0].friendId).toBe("user-2");
-      expect(result[1].friendId).toBe("user-3");
+      expect(result[0].sender.id).toBe("user-1");
+      expect(result[0].receiver.id).toBe("user-2");
+      expect(result[1].sender.id).toBe("user-3");
+      expect(result[1].receiver.id).toBe("user-1");
     });
   });
 
   describe("getBlockedUsers", () => {
     it("should return only users blocked by me", async () => {
       vi.mocked(prisma.friendship.findMany).mockResolvedValue([
-        makeFriendship({ senderId: "user-1", receiverId: "user-5", status: "BLOCKED" }),
+        {
+          ...makeFriendship({ senderId: "user-1", receiverId: "user-5", status: "BLOCKED" }),
+          sender: { id: "user-1", username: "user1", avatar: null },
+          receiver: { id: "user-5", username: "user5", avatar: null },
+        },
       ] as any);
 
       const result = await service.getBlockedUsers("user-1");
 
       expect(result).toHaveLength(1);
-      expect(result[0].userId).toBe("user-5");
+      expect(result[0].receiver.id).toBe("user-5");
     });
   });
 });

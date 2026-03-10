@@ -9,6 +9,8 @@ import type {
   UpdatePermissionsDto,
 } from "./roles.schema.js";
 import { toRoleResponse } from "./roles.mapper.js";
+import { getIO } from "../../websocket/index.js";
+import { createAuditEntry } from "../audit/audit.service.js";
 
 export class RolesService {
   private async requireMember(serverId: string, userId: string) {
@@ -33,7 +35,19 @@ export class RolesService {
     await checkPermission(userId, serverId, Permission.CONFIGURE_ROLES);
 
     const role = await prisma.$transaction(async (tx) => {
-      const count = await tx.role.count({ where: { serverId } });
+      // @world always stays at the last position — insert new role just before it
+      const worldRole = await tx.role.findFirst({
+        where: { serverId, isWorld: true },
+      });
+      const insertPos = worldRole ? worldRole.position : await tx.role.count({ where: { serverId } });
+
+      if (worldRole) {
+        await tx.role.update({
+          where: { id: worldRole.id },
+          data: { position: worldRole.position + 1 },
+        });
+      }
+
       return tx.role.create({
         data: {
           id: generateId(),
@@ -41,12 +55,24 @@ export class RolesService {
           name: dto.name,
           color: dto.color,
           permissions: dto.permissions ? BigInt(dto.permissions) : 0n,
-          position: count, // append at the end (0-indexed)
+          position: insertPos,
+          separate: dto.separate ?? false,
         },
       });
     });
 
-    return toRoleResponse(role);
+    const response = toRoleResponse(role);
+
+    await createAuditEntry(serverId, userId, "ROLE_CREATE", "Role", role.id, {
+      roleName: dto.name,
+    });
+
+    const io = getIO();
+    if (io) {
+      io.to(`server:${serverId}`).emit("role:created", { serverId, role: response });
+    }
+
+    return response;
   }
 
   async update(
@@ -60,9 +86,29 @@ export class RolesService {
       where: { id: roleId, serverId },
     });
     if (!role) throw new AppError("Role not found", 404, "ROLE_NOT_FOUND");
+    if (role.isWorld) {
+      if (dto.position !== undefined)
+        throw new AppError("Cannot move the @world role", 400, "CANNOT_MOVE_WORLD_ROLE");
+      if (dto.name !== undefined)
+        throw new AppError("Cannot rename the @world role", 400, "CANNOT_RENAME_WORLD_ROLE");
+      if (dto.color !== undefined)
+        throw new AppError("Cannot change the @world role color", 400, "CANNOT_RECOLOR_WORLD_ROLE");
+    }
 
     const updated = await prisma.$transaction(async (tx) => {
       if (dto.position !== undefined && dto.position !== role.position) {
+        // Prevent moving a role to or past @world's position
+        const worldRole = await tx.role.findFirst({
+          where: { serverId, isWorld: true },
+        });
+        if (worldRole && dto.position >= worldRole.position) {
+          throw new AppError(
+            "Cannot move a role past the @world role",
+            400,
+            "CANNOT_MOVE_PAST_WORLD_ROLE",
+          );
+        }
+
         const oldPos = role.position;
         const newPos = dto.position;
 
@@ -89,11 +135,23 @@ export class RolesService {
           permissions:
             dto.permissions !== undefined ? BigInt(dto.permissions) : undefined,
           ...(dto.position !== undefined ? { position: dto.position } : {}),
+          ...(dto.separate !== undefined ? { separate: dto.separate } : {}),
         },
       });
     });
 
-    return toRoleResponse(updated);
+    const response = toRoleResponse(updated);
+
+    await createAuditEntry(serverId, userId, "ROLE_UPDATE", "Role", roleId, {
+      roleName: dto.name ?? role.name,
+    });
+
+    const io = getIO();
+    if (io) {
+      io.to(`server:${serverId}`).emit("role:updated", { serverId, role: response });
+    }
+
+    return response;
   }
 
   async delete(serverId: string, roleId: string, userId: string) {
@@ -102,6 +160,12 @@ export class RolesService {
       where: { id: roleId, serverId },
     });
     if (!role) throw new AppError("Role not found", 404, "ROLE_NOT_FOUND");
+    if (role.isWorld)
+      throw new AppError(
+        "Cannot delete the @world role",
+        400,
+        "CANNOT_DELETE_WORLD_ROLE",
+      );
 
     await prisma.$transaction(async (tx) => {
       await tx.role.delete({ where: { id: roleId } });
@@ -111,6 +175,15 @@ export class RolesService {
         data: { position: { decrement: 1 } },
       });
     });
+
+    await createAuditEntry(serverId, userId, "ROLE_DELETE", "Role", roleId, {
+      roleName: role.name,
+    });
+
+    const io = getIO();
+    if (io) {
+      io.to(`server:${serverId}`).emit("role:deleted", { serverId, roleId });
+    }
   }
 
   async assignToMember(
@@ -125,6 +198,12 @@ export class RolesService {
       where: { id: roleId, serverId },
     });
     if (!role) throw new AppError("Role not found", 404, "ROLE_NOT_FOUND");
+    if (role.isWorld)
+      throw new AppError(
+        "Cannot assign the @world role",
+        400,
+        "CANNOT_ASSIGN_WORLD_ROLE",
+      );
 
     const member = await prisma.serverMember.findUnique({
       where: { userId_serverId: { userId: targetUserId, serverId } },
@@ -145,6 +224,17 @@ export class RolesService {
     await prisma.memberRole.create({
       data: { memberId: member.userId, roleId },
     });
+
+    await createAuditEntry(serverId, userId, "ROLE_ASSIGN", "Role", roleId, {
+      roleName: role.name,
+      targetUserId,
+    });
+
+    const io = getIO();
+    if (io) {
+      io.to(`server:${serverId}`).emit("role:assigned", { serverId, roleId, userId: targetUserId });
+      io.to(`user:${targetUserId}`).emit("role:self_assigned", { serverId, roleId });
+    }
   }
 
   async removeFromMember(
@@ -159,6 +249,12 @@ export class RolesService {
       where: { id: roleId, serverId },
     });
     if (!role) throw new AppError("Role not found", 404, "ROLE_NOT_FOUND");
+    if (role.isWorld)
+      throw new AppError(
+        "Cannot unassign the @world role",
+        400,
+        "CANNOT_UNASSIGN_WORLD_ROLE",
+      );
 
     const member = await prisma.serverMember.findUnique({
       where: { userId_serverId: { userId: targetUserId, serverId } },
@@ -179,6 +275,17 @@ export class RolesService {
     await prisma.memberRole.delete({
       where: { memberId_roleId: { memberId: member.userId, roleId } },
     });
+
+    await createAuditEntry(serverId, userId, "ROLE_REMOVE", "Role", roleId, {
+      roleName: role.name,
+      targetUserId,
+    });
+
+    const io = getIO();
+    if (io) {
+      io.to(`server:${serverId}`).emit("role:removed", { serverId, roleId, userId: targetUserId });
+      io.to(`user:${targetUserId}`).emit("role:self_removed", { serverId, roleId });
+    }
   }
 
   async updatePermissions(
@@ -196,13 +303,21 @@ export class RolesService {
       where: { id: roleId },
       data: { permissions: BigInt(dto.permissions) },
     });
-    return toRoleResponse(updated);
+
+    const response = toRoleResponse(updated);
+
+    const io = getIO();
+    if (io) {
+      io.to(`server:${serverId}`).emit("role:updated", { serverId, role: response });
+    }
+
+    return response;
   }
 
   async getMemberRoles(serverId: string, userId: string, memberId: string) {
     await this.requireMember(serverId, userId);
     const memberRoles = await prisma.memberRole.findMany({
-      where: { memberId },
+      where: { memberId, role: { serverId } },
       include: { role: true },
     });
     return memberRoles

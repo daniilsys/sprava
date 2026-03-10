@@ -7,7 +7,7 @@ import { authMiddleware } from "../../middlewares/auth.middleware.js";
 const router = Router();
 const friendshipsController = new FriendshipsController();
 
-router.post("/:receiverId", authMiddleware, friendshipsController.sendRequest);
+router.post("/:username", authMiddleware, friendshipsController.sendRequest);
 
 router.put(
   "/",

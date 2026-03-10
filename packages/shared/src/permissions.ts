@@ -92,3 +92,15 @@ export const PermissionUtils = {
       PermissionUtils.has(bitfield, Permission[key]),
     ),
 } as const;
+
+export const DEFAULT_WORLD_PERMISSIONS = PermissionUtils.combine(
+  Permission.VIEW_CHANNEL,
+  Permission.READ_MESSAGES,
+  Permission.POST_MESSAGES,
+  Permission.VIEW_HISTORY,
+  Permission.UPLOAD,
+  Permission.REACT,
+  Permission.JOIN_VOICE,
+  Permission.SPEAK,
+  Permission.GENERATE_INVITE,
+);

@@ -37,6 +37,9 @@ model User {
   emailVerifications    EmailVerification[]
   passwordResets        PasswordReset[]
   readStates            ReadState[]
+  userStatus            UserStatus?
+  pins                  Pin[]
+  auditLogs             AuditLog[]     @relation("auditLogs")
 }
 
 model RefreshToken {
@@ -93,7 +96,8 @@ model UserSettings {
   showEmail    PrivacyLevel @default(NOBODY)
   showWebsite  PrivacyLevel @default(PUBLIC)
 
-  dmPrivacy     DMPrivacyLevel @default(COMMON_SERVER)
+  dmPrivacy          DMPrivacyLevel    @default(COMMON_SERVER)
+  noiseCancellation  NoiseCancellation @default(HIGH_QUALITY)
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -121,6 +125,21 @@ enum DMPrivacyLevel {
 enum Language {
   en
   fr
+}
+
+enum NoiseCancellation {
+  OFF
+  LIGHT
+  HIGH_QUALITY
+}
+
+model UserStatus {
+  userId        String   @unique
+  status        String   @default("online") // online, idle, dnd, offline
+  statusMessage String   @default("")
+  updatedAt     DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 // ─── Amis ───────────────────────────────────────────
@@ -152,14 +171,15 @@ model Server {
   name        String
   description String?
   icon        String?
-  inviteCode  String   @unique @default(cuid())
+  inviteCode  String   @unique
   ownerId     String
   createdAt   DateTime @default(now())
 
-  members  ServerMember[]
-  channels Channel[]
-  roles    Role[]
-  bans     ServerBan[]
+  members   ServerMember[]
+  channels  Channel[]
+  roles     Role[]
+  bans      ServerBan[]
+  auditLogs AuditLog[]
 }
 
 model ServerMember {
@@ -195,6 +215,8 @@ model Role {
   serverId    String
   permissions BigInt   @default(0)
   position    Int      @default(0)
+  isWorld     Boolean  @default(false)
+  separate    Boolean  @default(false)
 
   server  Server     @relation(fields: [serverId], references: [id], onDelete: Cascade)
   channelRules ChannelRule[]
@@ -220,13 +242,18 @@ model Channel {
   type     ChannelType @default(TEXT)
   position Int         @default(0)
   serverId String
+  parentId String?
+  syncParentRules Boolean @default(true)
 
   server   Server    @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  parent   Channel?  @relation("ChannelParent", fields: [parentId], references: [id], onDelete: SetNull)
+  children Channel[] @relation("ChannelParent")
   rules    ChannelRule[]
   messages Message[]
   readStates ReadState[]
+  pins     Pin[]
 
-  @@index([serverId]) 
+  @@index([serverId])
 }
 
 model ChannelRule {
@@ -266,6 +293,7 @@ model DmConversation {
 
   participants DmParticipant[]
   messages     Message[]
+  pins         Pin[]
 }
 
 model DmParticipant {
@@ -308,6 +336,7 @@ model Message {
 
   attachments Attachment[]
   reactions   Reaction[]
+  pins        Pin[]
 
   @@index([channelId, createdAt(sort: Desc)])        
   @@index([dmConversationId, createdAt(sort: Desc)])  
@@ -359,4 +388,42 @@ model ReadState {
 
   @@unique([userId, channelId])
   @@unique([userId, dmConversationId])
+}
+
+// ─── Pins ──────────────────────────────────────────
+
+model Pin {
+  id                String           @id
+  messageId         String
+  channelId         String?
+  dmConversationId  String?
+  pinnedById        String
+  pinnedAt          DateTime         @default(now())
+
+  message           Message          @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  channel           Channel?         @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  dmConversation    DmConversation?  @relation(fields: [dmConversationId], references: [id], onDelete: Cascade)
+  pinnedBy          User             @relation(fields: [pinnedById], references: [id])
+
+  @@unique([messageId])
+  @@index([channelId])
+  @@index([dmConversationId])
+}
+
+// ─── Audit Log ──────────────────────────────────────
+
+model AuditLog {
+  id         String   @id
+  serverId   String
+  userId     String
+  actionType String
+  targetType String?
+  targetId   String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  server     Server   @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  user       User     @relation("auditLogs", fields: [userId], references: [id])
+
+  @@index([serverId, createdAt(sort: Desc)])
 }

@@ -22,9 +22,11 @@ export const createRoleSchema = z.object({
   color: z
     .string()
     .regex(/^#[0-9A-Fa-f]{6}$/, "Must be a valid hex color")
+    .nullable()
     .optional(),
   permissions: permissionBitfield.optional(),
   position: z.number().int().positive().optional(),
+  separate: z.boolean().optional(),
 });
 
 export const updateRoleSchema = createRoleSchema

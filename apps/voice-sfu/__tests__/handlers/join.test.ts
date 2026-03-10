@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { handleJoin } from "../../src/handlers/join.js";
 import { publishResponse } from "../../src/redis/publisher.js";
-import { userTransports, userRooms, roomProducers } from "../../src/state.js";
-import { mockRouter, mockTransport } from "../setup.js";
+import { transports, userTransportIds, userRooms, roomProducers } from "../../src/state.js";
+import { mockRouter, mockSendTransport, mockRecvTransport } from "../setup.js";
 import type { VoiceCommand } from "../../src/redis/subscriber.js";
 
 vi.mock("../../src/redis/publisher.js", () => ({
@@ -29,30 +29,39 @@ const makeCmd = (overrides?: Partial<VoiceCommand>): VoiceCommand => ({
 
 describe("handleJoin", () => {
   beforeEach(() => {
-    userTransports.clear();
+    transports.clear();
+    userTransportIds.clear();
     userRooms.clear();
     roomProducers.clear();
     vi.mocked(getOrCreateRoom).mockResolvedValue(mockRouter as any);
   });
 
-  it("creates a transport and stores it in state", async () => {
+  it("creates send and recv transports and stores them in state", async () => {
     await handleJoin(makeCmd());
 
-    expect(userTransports.get("user-1")).toBe(mockTransport);
+    expect(transports.get(mockSendTransport.id)).toBe(mockSendTransport);
+    expect(transports.get(mockRecvTransport.id)).toBe(mockRecvTransport);
+    expect(userTransportIds.get("user-1")).toEqual([mockSendTransport.id, mockRecvTransport.id]);
     expect(userRooms.get("user-1")).toBe("channel:ch1");
   });
 
-  it("responds with transportParams and routerRtpCapabilities", async () => {
+  it("responds with sendTransportOptions, recvTransportOptions and routerRtpCapabilities", async () => {
     await handleJoin(makeCmd());
 
     expect(publishResponse).toHaveBeenCalledWith("req-1", {
       ok: true,
       payload: {
-        transportParams: {
-          id: mockTransport.id,
-          iceParameters: mockTransport.iceParameters,
-          iceCandidates: mockTransport.iceCandidates,
-          dtlsParameters: mockTransport.dtlsParameters,
+        sendTransportOptions: {
+          id: mockSendTransport.id,
+          iceParameters: mockSendTransport.iceParameters,
+          iceCandidates: mockSendTransport.iceCandidates,
+          dtlsParameters: mockSendTransport.dtlsParameters,
+        },
+        recvTransportOptions: {
+          id: mockRecvTransport.id,
+          iceParameters: mockRecvTransport.iceParameters,
+          iceCandidates: mockRecvTransport.iceCandidates,
+          dtlsParameters: mockRecvTransport.dtlsParameters,
         },
         routerRtpCapabilities: mockRouter.rtpCapabilities,
         existingProducers: [],
@@ -76,14 +85,15 @@ describe("handleJoin", () => {
     ]);
   });
 
-  it("closes stale transport on reconnect", async () => {
+  it("closes stale transports on reconnect", async () => {
     const staleTransport = { close: vi.fn() } as any;
-    userTransports.set("user-1", staleTransport);
+    transports.set("stale-t1", staleTransport);
+    userTransportIds.set("user-1", ["stale-t1"]);
 
     await handleJoin(makeCmd());
 
     expect(staleTransport.close).toHaveBeenCalled();
-    expect(userTransports.get("user-1")).toBe(mockTransport);
+    expect(transports.has("stale-t1")).toBe(false);
   });
 
   it("responds with error on failure", async () => {

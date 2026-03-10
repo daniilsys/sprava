@@ -1,0 +1,19 @@
+{
+  "sidebar.title": "Direct Messages",
+  "sidebar.search": "Search",
+  "sidebar.shortcut": "\u2318K",
+  "sidebar.empty": "No conversations yet",
+  "item.unknown": "Unknown",
+  "item.markAsRead": "Mark as Read",
+  "item.copyUserId": "Copy User ID",
+  "item.callActive": "Call in progress",
+  "newDm.tooltip": "New DM",
+  "newDm.title": "New Message",
+  "newDm.maxSize": "Select up to {{max}} friends.",
+  "newDm.groupHint": "This will create a group DM.",
+  "newDm.searchPlaceholder": "Search friends...",
+  "newDm.createGroup": "Create Group DM",
+  "newDm.createDm": "Create DM",
+  "newDm.noFriends": "Add some friends first!",
+  "newDm.noResults": "No friends match \"{{search}}\""
+}

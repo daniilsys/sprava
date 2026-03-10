@@ -5,6 +5,8 @@ type RoleInput = {
   serverId: string;
   permissions: bigint;
   position: number;
+  isWorld: boolean;
+  separate: boolean;
 };
 
 /** Serializes permissions BigInt to string (JSON-safe). */
@@ -16,6 +18,8 @@ export function toRoleResponse(role: RoleInput) {
     serverId: role.serverId,
     permissions: role.permissions.toString(),
     position: role.position,
+    isWorld: role.isWorld,
+    separate: role.separate,
   };
 }
 

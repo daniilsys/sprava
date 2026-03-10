@@ -12,6 +12,7 @@ export const updateSettingsSchema = z
     showEmail: privacyLevel.optional(),
     showWebsite: privacyLevel.optional(),
     dmPrivacy: z.enum(["COMMON_SERVER", "FRIENDS_ONLY"]).optional(),
+    noiseCancellation: z.enum(["OFF", "LIGHT", "HIGH_QUALITY"]).optional(),
   })
   .refine((data) => Object.keys(data).length > 0, {
     message: "At least one field must be provided",

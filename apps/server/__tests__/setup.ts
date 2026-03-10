@@ -44,6 +44,9 @@ const mockPrisma = {
   dmParticipant: createModelMock(),
   role: createModelMock(),
   memberRole: createModelMock(),
+  userStatus: createModelMock(),
+  auditLog: createModelMock(),
+  pin: createModelMock(),
   $transaction: vi.fn(async (arg: unknown) => {
     if (typeof arg === "function") return arg(mockPrisma);
     return Promise.all(arg as Promise<unknown>[]);
@@ -70,6 +73,9 @@ const mockRedis = {
     sadd: vi.fn().mockReturnThis(),
     srem: vi.fn().mockReturnThis(),
     smembers: vi.fn().mockReturnThis(),
+    del: vi.fn().mockReturnThis(),
+    get: vi.fn().mockReturnThis(),
+    set: vi.fn().mockReturnThis(),
     expire: vi.fn().mockReturnThis(),
     exec: vi.fn(async () => []),
   })),

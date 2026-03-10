@@ -12,6 +12,7 @@ import { makeMember, makeServer } from "../../helpers/factories.js";
 function createMockSocket(userId: string) {
   const handlers = new Map<string, Function>();
   const socket = {
+    id: "socket-1",
     data: { userId },
     join: vi.fn(),
     leave: vi.fn(),
@@ -63,6 +64,9 @@ describe("Socket Handlers", () => {
     // Ready cache misses — force DB fetch
     vi.mocked(redis.get).mockResolvedValue(null);
 
+    // Mock redis.smembers for presence subscriptions
+    vi.mocked(redis.smembers).mockResolvedValue([]);
+
     // DB responses for emitReady
     vi.mocked(prisma.user.findUnique).mockResolvedValue({
       id: "user-1",
@@ -75,6 +79,8 @@ describe("Socket Handlers", () => {
     vi.mocked(prisma.friendship.findMany).mockResolvedValue([]);
     vi.mocked(prisma.dmConversation.findMany).mockResolvedValue([]);
     vi.mocked(prisma.readState.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.memberRole.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.channelRule.findMany).mockResolvedValue([]);
   });
 
   // ── Connection + room joining ─────────────────────────────────────────────
@@ -92,9 +98,14 @@ describe("Socket Handlers", () => {
       expect(socket.on).toHaveBeenCalledWith("channel:read", expect.any(Function));
       expect(socket.on).toHaveBeenCalledWith("dm:read", expect.any(Function));
       expect(socket.on).toHaveBeenCalledWith("disconnect", expect.any(Function));
+      // New handlers
+      expect(socket.on).toHaveBeenCalledWith("presence:subscribe", expect.any(Function));
+      expect(socket.on).toHaveBeenCalledWith("presence:unsubscribe", expect.any(Function));
+      expect(socket.on).toHaveBeenCalledWith("channel:focus", expect.any(Function));
+      expect(socket.on).toHaveBeenCalledWith("server:request_members", expect.any(Function));
     });
 
-    it("should join user to correct rooms", async () => {
+    it("should join user to correct rooms (P2: no channel rooms)", async () => {
       const { registerSocketHandlers } = await import(
         "../../../src/websocket/socket.handlers.js"
       );
@@ -102,7 +113,8 @@ describe("Socket Handlers", () => {
 
       expect(socket.join).toHaveBeenCalledWith("user:user-1");
       expect(socket.join).toHaveBeenCalledWith("server:s1");
-      expect(socket.join).toHaveBeenCalledWith("channel:ch1");
+      // P2: channel rooms are NOT joined on connect (joined via channel:focus)
+      expect(socket.join).not.toHaveBeenCalledWith("channel:ch1");
       expect(socket.join).toHaveBeenCalledWith("dm:dm1");
     });
 
@@ -122,14 +134,17 @@ describe("Socket Handlers", () => {
       }));
     });
 
-    it("should broadcast user:presence online to server members", async () => {
+    it("should broadcast presence to subscribers on connect", async () => {
+      // Simulate someone is subscribed to this user's presence
+      vi.mocked(redis.smembers).mockResolvedValue(["user-2"]);
+
       const { registerSocketHandlers } = await import(
         "../../../src/websocket/socket.handlers.js"
       );
       await registerSocketHandlers(io as any, socket as any);
 
-      // socket.to should have been called for presence broadcast
-      expect(socket.to).toHaveBeenCalledWith("server:s1");
+      // Should broadcast to subscribers via io.to(["user:user-2"])
+      expect(io.to).toHaveBeenCalledWith(["user:user-2"]);
     });
   });
 
@@ -236,7 +251,10 @@ describe("Socket Handlers", () => {
   // ── Disconnect ────────────────────────────────────────────────────────────
 
   describe("disconnect", () => {
-    it("should broadcast offline presence when no other sockets remain", async () => {
+    it("should broadcast offline presence to subscribers when no other sockets remain", async () => {
+      // Subscribe user-2 to user-1's presence
+      vi.mocked(redis.smembers).mockResolvedValue(["user-2"]);
+
       const { registerSocketHandlers } = await import(
         "../../../src/websocket/socket.handlers.js"
       );
@@ -248,8 +266,8 @@ describe("Socket Handlers", () => {
       const disconnectHandler = socket._handlers.get("disconnect");
       await disconnectHandler!();
 
-      // Should broadcast offline
-      expect(io.to).toHaveBeenCalledWith("server:s1");
+      // Should broadcast offline to subscribers
+      expect(io.to).toHaveBeenCalledWith(["user:user-2"]);
     });
 
     it("should NOT broadcast offline if other sockets remain", async () => {
@@ -260,6 +278,7 @@ describe("Socket Handlers", () => {
 
       // Clear previous calls
       io.to.mockClear();
+      vi.mocked(redis.smembers).mockResolvedValue([]);
 
       // Simulate another active socket
       io._chainable.fetchSockets.mockResolvedValue([{ id: "other-socket" }]);
@@ -267,12 +286,10 @@ describe("Socket Handlers", () => {
       const disconnectHandler = socket._handlers.get("disconnect");
       await disconnectHandler!();
 
-      // Should not have emitted user:presence offline
-      const offlineCalls = io.to.mock.calls.filter(
-        (call: any[]) => call[0] === "server:s1",
-      );
-      // The disconnect handler should not emit presence for this path
-      // (it may still call io.to for other reasons, but fetchSockets returning 1 should skip)
+      // Should not have broadcast offline presence
+      const offlineCalls = io.to.mock.calls;
+      // No io.to calls for presence broadcast since user has remaining sockets
+      expect(offlineCalls.length).toBe(0);
     });
   });
 });

@@ -16,7 +16,7 @@ RUN pnpm install --frozen-lockfile --filter voice-sfu...
 
 # Copy source and compile TypeScript
 COPY apps/voice-sfu/ ./apps/voice-sfu/
-RUN pnpm --filter voice-sfu build
+RUN rm -rf apps/voice-sfu/dist && pnpm --filter voice-sfu build
 
 # Create a self-contained deployment in /standalone
 # (copies dist/ + node_modules/ with only prod deps)

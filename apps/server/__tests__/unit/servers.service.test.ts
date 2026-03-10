@@ -5,7 +5,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ServersService } from "../../src/modules/servers/servers.service.js";
 import { prisma } from "../../src/config/db.js";
-import { makeServer, makeMember } from "../helpers/factories.js";
+import { makeServer, makeMember, makeRole } from "../helpers/factories.js";
 import { AppError } from "../../src/utils/AppError.js";
 import { checkPermission, checkRoleHierarchy } from "../../src/utils/checkPermission.js";
 
@@ -19,19 +19,20 @@ describe("ServersService", () => {
   // ── Create ─────────────────────────────────────────────────────────────────
 
   describe("create", () => {
-    it("should create server with default channels and owner membership", async () => {
+    it("should create server with default channels, @world role, and owner membership", async () => {
       const server = makeServer({ id: "s1", name: "My Server", ownerId: "user-1" });
       const fullServer = {
         ...server,
         members: [makeMember({ userId: "user-1", serverId: "s1" })],
         channels: [],
-        roles: [],
+        roles: [makeRole({ name: "@world", isWorld: true })],
       };
 
       // $transaction passes mockPrisma as tx, so mock its models directly
       vi.mocked(prisma.server.create).mockResolvedValue(server as any);
       vi.mocked(prisma.server.findUnique).mockResolvedValue(fullServer as any);
       vi.mocked(prisma.serverMember.create).mockResolvedValue({} as any);
+      vi.mocked(prisma.role.create).mockResolvedValue({} as any);
       vi.mocked(prisma.channel.createMany).mockResolvedValue({ count: 2 } as any);
 
       const result = await service.create(
@@ -41,6 +42,15 @@ describe("ServersService", () => {
 
       expect(result).toBeTruthy();
       expect(result!.name).toBe("My Server");
+      expect(prisma.role.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            name: "@world",
+            isWorld: true,
+            position: 0,
+          }),
+        }),
+      );
     });
   });
 
@@ -66,6 +76,9 @@ describe("ServersService", () => {
       vi.mocked(prisma.server.findUnique).mockResolvedValue(
         makeServer({ ownerId: "user-1" }) as any,
       );
+      vi.mocked(prisma.serverMember.findMany).mockResolvedValue([
+        { userId: "user-1", serverId: "s1" },
+      ] as any);
       vi.mocked(prisma.server.delete).mockResolvedValue({} as any);
 
       await expect(service.delete("s1", "user-1")).resolves.toBeUndefined();
@@ -184,6 +197,7 @@ describe("ServersService", () => {
     it("should ban member and remove membership", async () => {
       vi.mocked(prisma.$transaction).mockImplementation(async (fn: any) => {
         const tx = {
+          memberRole: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
           serverBan: { create: vi.fn().mockResolvedValue({}) },
           serverMember: { delete: vi.fn().mockResolvedValue({}) },
         };

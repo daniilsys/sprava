@@ -42,6 +42,21 @@ export class DmController {
         req.userId,
         req.query.before as string | undefined,
         req.query.limit ? parseInt(req.query.limit as string) : undefined,
+        req.query.around as string | undefined,
+      );
+      res.json(messages);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async searchMessages(req: Request, res: Response, next: NextFunction) {
+    try {
+      const messages = await dmService.searchMessages(
+        req.params.id.toString(),
+        req.userId,
+        (req.query.q as string) || "",
+        req.query.limit ? parseInt(req.query.limit as string) : undefined,
       );
       res.json(messages);
     } catch (err) {

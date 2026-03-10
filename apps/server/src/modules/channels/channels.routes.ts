@@ -9,6 +9,8 @@ import {
   channelRuleSchema,
   deleteChannelRuleSchema,
   markReadSchema,
+  reorderChannelsSchema,
+  searchMessagesSchema,
 } from "./channels.schema.js";
 import { messagesLimiter } from "../../middlewares/rateLimiter.middleware.js";
 
@@ -21,6 +23,13 @@ router.post(
   validate(createChannelSchema),
   channelsController.create,
 );
+router.patch(
+  "/reorder/:serverId",
+  authMiddleware,
+  validate(reorderChannelsSchema),
+  channelsController.reorder,
+);
+
 router.post(
   "/:id/messages",
   authMiddleware,
@@ -30,6 +39,12 @@ router.post(
 );
 
 router.get("/:id", authMiddleware, channelsController.getById);
+router.get(
+  "/:id/messages/search",
+  authMiddleware,
+  validate(searchMessagesSchema, "query"),
+  channelsController.searchMessages,
+);
 router.get("/:id/messages", authMiddleware, channelsController.getMessages);
 
 router.put(

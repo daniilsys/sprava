@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="24 24 208 208" role="img" aria-label="Sprava mascot">
+  <rect x="36" y="36" width="184" height="184" rx="56" fill="#0A1020" stroke="#F28C4A" stroke-width="10"/>
+  <circle cx="98" cy="108" r="14" fill="#EDECF6"/>
+  <circle cx="158" cy="108" r="14" fill="#EDECF6"/>
+  <path d="M88 158 Q104 140 120 158 T152 158 T184 158" stroke="#2DD4BF" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>

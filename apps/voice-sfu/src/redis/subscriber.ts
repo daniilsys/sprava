@@ -4,12 +4,15 @@ import { handleConnectTransport } from "../handlers/connect.js";
 import { handleProduce } from "../handlers/produce.js";
 import { handleConsume } from "../handlers/consume.js";
 import { handleLeave } from "../handlers/leave.js";
+import { handleResumeConsumer } from "../handlers/resume.js";
+import { handleSetPreferredLayers } from "../handlers/setLayers.js";
+import { handlePauseConsumer } from "../handlers/pauseConsumer.js";
 
 // ─── Protocol types (shared with Server A) ───────────────────────────────────
 
 export interface VoiceCommand {
   requestId: string;
-  type: "JOIN" | "CONNECT_TRANSPORT" | "PRODUCE" | "CONSUME" | "LEAVE";
+  type: "JOIN" | "CONNECT_TRANSPORT" | "PRODUCE" | "CONSUME" | "LEAVE" | "RESUME_CONSUMER" | "SET_PREFERRED_LAYERS" | "PAUSE_CONSUMER";
   roomId: string;
   userId: string;
   payload: unknown;
@@ -23,7 +26,7 @@ export interface VoiceResponse {
 }
 
 export interface VoiceNotification {
-  type: "NEW_PRODUCER" | "USER_LEFT";
+  type: "NEW_PRODUCER" | "USER_LEFT" | "ACTIVE_SPEAKERS";
   roomId: string;
   userId: string;
   payload?: unknown;
@@ -31,8 +34,10 @@ export interface VoiceNotification {
 
 // ─── Subscriber setup ─────────────────────────────────────────────────────────
 
+let sub: Redis | null = null;
+
 export function startCommandSubscriber(): void {
-  const sub = new Redis(process.env.REDIS_URL ?? "redis://localhost:6379");
+  sub = new Redis(process.env.REDIS_URL ?? "redis://localhost:6379");
 
   sub.subscribe("voice:cmd", (err) => {
     if (err) {
@@ -59,6 +64,15 @@ export function startCommandSubscriber(): void {
   });
 }
 
+/** Close the subscriber connection (for graceful shutdown). */
+export async function stopCommandSubscriber(): Promise<void> {
+  if (sub) {
+    await sub.unsubscribe("voice:cmd");
+    sub.disconnect();
+    sub = null;
+  }
+}
+
 async function dispatch(cmd: VoiceCommand): Promise<void> {
   switch (cmd.type) {
     case "JOIN":
@@ -75,6 +89,15 @@ async function dispatch(cmd: VoiceCommand): Promise<void> {
       break;
     case "LEAVE":
       await handleLeave(cmd);
+      break;
+    case "RESUME_CONSUMER":
+      await handleResumeConsumer(cmd);
+      break;
+    case "SET_PREFERRED_LAYERS":
+      await handleSetPreferredLayers(cmd);
+      break;
+    case "PAUSE_CONSUMER":
+      await handlePauseConsumer(cmd);
       break;
     default:
       console.warn(`[subscriber] Unknown command type: ${(cmd as VoiceCommand).type}`);

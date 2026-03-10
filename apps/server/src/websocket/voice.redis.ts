@@ -17,7 +17,7 @@ const redisSub = new Redis(REDIS_URL);
 
 export interface VoiceCommand {
   requestId: string;
-  type: "JOIN" | "CONNECT_TRANSPORT" | "PRODUCE" | "CONSUME" | "LEAVE";
+  type: "JOIN" | "CONNECT_TRANSPORT" | "PRODUCE" | "CONSUME" | "LEAVE" | "SET_PREFERRED_LAYERS" | "PAUSE_CONSUMER" | "RESUME_CONSUMER";
   roomId: string;
   userId: string;
   payload: unknown;
@@ -31,7 +31,7 @@ export interface VoiceResponse {
 }
 
 export interface VoiceNotification {
-  type: "NEW_PRODUCER" | "USER_LEFT";
+  type: "NEW_PRODUCER" | "USER_LEFT" | "ACTIVE_SPEAKERS";
   roomId: string;
   userId: string;
   payload?: unknown;

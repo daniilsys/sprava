@@ -58,7 +58,7 @@ export const messagesLimiter = rateLimit({
 
 export const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 min
-  limit: 100,
+  limit: 300,
   standardHeaders: "draft-7",
   legacyHeaders: false,
   store: makeStore("rl:global:"),

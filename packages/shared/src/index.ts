@@ -1,4 +1,4 @@
-export { Permission, PermissionUtils } from "./permissions.js";
+export { Permission, PermissionUtils, DEFAULT_WORLD_PERMISSIONS } from "./permissions.js";
 export type { PermissionKey } from "./permissions.js";
 
 export { SocketEvent } from "./socket-events.js";
@@ -12,6 +12,7 @@ export type {
   SocketReaction,
   SocketAttachment,
   SocketChannel,
+  SocketChannelRule,
   SocketRole,
   SocketMember,
   SocketServer,

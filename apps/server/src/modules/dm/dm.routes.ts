@@ -40,6 +40,7 @@ router.post(
   controller.sendMessage,
 );
 router.get("/:id/messages", authMiddleware, controller.getMessages);
+router.get("/:id/messages/search", authMiddleware, controller.searchMessages);
 
 router.get("/:id/read", authMiddleware, controller.getReadState);
 router.post(

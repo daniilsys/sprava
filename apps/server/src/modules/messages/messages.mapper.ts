@@ -26,6 +26,8 @@ type MessageInput = {
   type: string;
   content: string;
   authorId: string;
+  channelId?: string | null;
+  dmConversationId?: string | null;
   createdAt: Date;
   editedAt: Date | null;
   replyToId?: string | null;
@@ -61,6 +63,8 @@ export function toMessageResponse(message: MessageInput) {
     type: message.type,
     content: message.content,
     authorId: message.authorId,
+    channelId: message.channelId ?? null,
+    dmConversationId: message.dmConversationId ?? null,
     createdAt: message.createdAt,
     editedAt: message.editedAt,
     replyToId: message.replyToId ?? null,

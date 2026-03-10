@@ -16,7 +16,7 @@ export class FriendshipsController {
   async sendRequest(req: Request, res: Response, next: NextFunction) {
     try {
       const result = await friendshipsService.sendRequest(
-        req.params.receiverId.toString(),
+        req.params.username.toString(),
         req.userId,
       );
       res.json(result);

@@ -5,6 +5,7 @@ import type {
   SendMessageDto,
   ChannelRuleDto,
   DeleteChannelRuleDto,
+  ReorderChannelsDto,
 } from "./channels.schema.js";
 import { generateId } from "../../utils/snowflake.js";
 import { AppError } from "../../utils/AppError.js";
@@ -17,6 +18,7 @@ import {
   toChannelRuleResponse,
 } from "./channels.mapper.js";
 import { toMessageResponse } from "../messages/messages.mapper.js";
+import { createAuditEntry } from "../audit/audit.service.js";
 
 export class ChannelsService {
   async create(dto: CreateChannelDto, userId: string) {
@@ -33,6 +35,7 @@ export class ChannelsService {
           name: dto.name,
           type: dto.type,
           serverId: dto.serverId,
+          parentId: dto.parentId,
           position: count, // append at the end (0-indexed)
         },
         include: { server: true },
@@ -40,6 +43,11 @@ export class ChannelsService {
     });
 
     const response = toChannelResponse(channel);
+
+    await createAuditEntry(dto.serverId, userId, "CHANNEL_CREATE", "Channel", channel.id, {
+      channelName: dto.name,
+      channelType: dto.type,
+    });
 
     const io = getIO();
     if (io) {
@@ -97,11 +105,18 @@ export class ChannelsService {
           name: dto.name,
           type: dto.type,
           ...(dto.position !== undefined ? { position: dto.position } : {}),
+          parentId: dto.parentId !== undefined ? dto.parentId : undefined,
+          ...(dto.syncParentRules !== undefined ? { syncParentRules: dto.syncParentRules } : {}),
         },
       });
     });
 
     const response = toChannelResponse(updatedChannel);
+
+    await createAuditEntry(channel.serverId, userId, "CHANNEL_UPDATE", "Channel", channelId, {
+      channelName: dto.name,
+      channelType: dto.type,
+    });
 
     const io = getIO();
     if (io) {
@@ -135,6 +150,10 @@ export class ChannelsService {
         where: { serverId, position: { gt: deletedPos } },
         data: { position: { decrement: 1 } },
       });
+    });
+
+    await createAuditEntry(serverId, userId, "CHANNEL_DELETE", "Channel", channelId, {
+      channelName: channel.name,
     });
 
     const io = getIO();
@@ -174,6 +193,9 @@ export class ChannelsService {
     if (!channel) {
       throw new AppError("Channel not found", 404, "CHANNEL_NOT_FOUND");
     }
+    if (channel.type === "VOICE") {
+      throw new AppError("Cannot send messages in a voice channel", 400, "VOICE_CHANNEL_NO_MESSAGES");
+    }
 
     await checkPermission(
       userId,
@@ -189,9 +211,15 @@ export class ChannelsService {
           content: dto.content ?? "",
           channelId,
           authorId: userId,
+          ...(dto.replyToId ? { replyToId: dto.replyToId } : {}),
         },
         include: {
           author: { select: { id: true, username: true, avatar: true } },
+          replyTo: {
+            include: {
+              author: { select: { id: true, username: true, avatar: true } },
+            },
+          },
         },
       });
 
@@ -220,9 +248,18 @@ export class ChannelsService {
       reactions: [],
       attachments,
     });
-    getIO()
-      ?.to(`channel:${channelId}`)
-      .emit("channel:message_new", { message: response });
+    const io = getIO();
+    if (io) {
+      // Full message to users focused on this channel
+      io.to(`channel:${channelId}`).emit("channel:message_new", { message: response });
+      // P3: Lightweight unread notification to the whole server
+      // (users not focused on this channel use this for unread counts)
+      io.to(`server:${channel.serverId}`).emit("channel:unread_update", {
+        channelId,
+        messageId: message.id,
+        authorId: message.authorId,
+      });
+    }
 
     return response;
   }
@@ -260,21 +297,71 @@ export class ChannelsService {
 
     const data = { allow: BigInt(dto.allow), deny: BigInt(dto.deny) };
 
+    let rule;
     if (dto.roleId) {
-      const rule = await prisma.channelRule.upsert({
+      rule = await prisma.channelRule.upsert({
         where: { channelId_roleId: { channelId, roleId: dto.roleId } },
         create: { id: generateId(), channelId, roleId: dto.roleId, ...data },
         update: data,
       });
-      return toChannelRuleResponse(rule);
+    } else {
+      rule = await prisma.channelRule.upsert({
+        where: { channelId_memberId: { channelId, memberId: dto.memberId! } },
+        create: { id: generateId(), channelId, memberId: dto.memberId, ...data },
+        update: data,
+      });
     }
 
-    const rule = await prisma.channelRule.upsert({
-      where: { channelId_memberId: { channelId, memberId: dto.memberId! } },
-      create: { id: generateId(), channelId, memberId: dto.memberId, ...data },
-      update: data,
-    });
-    return toChannelRuleResponse(rule);
+    // Sync rules to children if this is a category
+    if (channel.type === "PARENT") {
+      const children = await prisma.channel.findMany({
+        where: { parentId: channelId, syncParentRules: true },
+      });
+      for (const child of children) {
+        if (dto.roleId) {
+          await prisma.channelRule.upsert({
+            where: { channelId_roleId: { channelId: child.id, roleId: dto.roleId } },
+            create: { id: generateId(), channelId: child.id, roleId: dto.roleId, ...data },
+            update: data,
+          });
+        } else {
+          await prisma.channelRule.upsert({
+            where: { channelId_memberId: { channelId: child.id, memberId: dto.memberId! } },
+            create: { id: generateId(), channelId: child.id, memberId: dto.memberId, ...data },
+            update: data,
+          });
+        }
+      }
+    }
+
+    const response = toChannelRuleResponse(rule);
+
+    // Emit socket event to all server members
+    const io = getIO();
+    if (io) {
+      io.to(`server:${channel.serverId}`).emit("channel:rule_updated", {
+        serverId: channel.serverId,
+        rule: response,
+      });
+
+      // Also emit for synced children
+      if (channel.type === "PARENT") {
+        const childRules = await prisma.channelRule.findMany({
+          where: {
+            channel: { parentId: channelId, syncParentRules: true },
+            ...(dto.roleId ? { roleId: dto.roleId } : { memberId: dto.memberId }),
+          },
+        });
+        for (const cr of childRules) {
+          io.to(`server:${channel.serverId}`).emit("channel:rule_updated", {
+            serverId: channel.serverId,
+            rule: toChannelRuleResponse(cr),
+          });
+        }
+      }
+    }
+
+    return response;
   }
 
   async deleteRule(
@@ -302,16 +389,50 @@ export class ChannelsService {
       await prisma.channelRule.delete({
         where: { channelId_roleId: { channelId, roleId: dto.roleId } },
       });
-      return;
+    } else {
+      const rule = await prisma.channelRule.findUnique({
+        where: { channelId_memberId: { channelId, memberId: dto.memberId! } },
+      });
+      if (!rule) throw new AppError("Rule not found", 404, "RULE_NOT_FOUND");
+      await prisma.channelRule.delete({
+        where: { channelId_memberId: { channelId, memberId: dto.memberId! } },
+      });
     }
 
-    const rule = await prisma.channelRule.findUnique({
-      where: { channelId_memberId: { channelId, memberId: dto.memberId! } },
-    });
-    if (!rule) throw new AppError("Rule not found", 404, "RULE_NOT_FOUND");
-    await prisma.channelRule.delete({
-      where: { channelId_memberId: { channelId, memberId: dto.memberId! } },
-    });
+    // Collect affected channel IDs for socket emission
+    const affectedChannelIds = [channelId];
+
+    // Sync rule deletion to children if this is a category
+    if (channel.type === "PARENT") {
+      const children = await prisma.channel.findMany({
+        where: { parentId: channelId, syncParentRules: true },
+      });
+      for (const child of children) {
+        affectedChannelIds.push(child.id);
+        if (dto.roleId) {
+          await prisma.channelRule.deleteMany({
+            where: { channelId: child.id, roleId: dto.roleId },
+          });
+        } else {
+          await prisma.channelRule.deleteMany({
+            where: { channelId: child.id, memberId: dto.memberId! },
+          });
+        }
+      }
+    }
+
+    // Emit socket events
+    const io = getIO();
+    if (io) {
+      for (const cId of affectedChannelIds) {
+        io.to(`server:${channel.serverId}`).emit("channel:rule_deleted", {
+          serverId: channel.serverId,
+          channelId: cId,
+          roleId: dto.roleId ?? null,
+          memberId: dto.memberId ?? null,
+        });
+      }
+    }
   }
 
   async getMessages(
@@ -319,6 +440,7 @@ export class ChannelsService {
     userId: string,
     before?: string,
     limit?: number,
+    around?: string,
   ) {
     const channel = await prisma.channel.findUnique({
       where: { id: channelId },
@@ -333,6 +455,32 @@ export class ChannelsService {
       Permission.READ_MESSAGES,
       channelId,
     );
+
+    if (around) {
+      const half = Math.floor((limit ?? 50) / 2);
+      const [beforeMsgs, afterMsgs] = await Promise.all([
+        prisma.message.findMany({
+          where: { channelId, deletedAt: null, id: { lt: around } },
+          orderBy: { createdAt: "desc" },
+          take: half,
+          include: {
+            author: true, reactions: true, attachments: true,
+            replyTo: { include: { author: { select: { id: true, username: true, avatar: true } } } },
+          },
+        }),
+        prisma.message.findMany({
+          where: { channelId, deletedAt: null, id: { gte: around } },
+          orderBy: { createdAt: "asc" },
+          take: half + 1,
+          include: {
+            author: true, reactions: true, attachments: true,
+            replyTo: { include: { author: { select: { id: true, username: true, avatar: true } } } },
+          },
+        }),
+      ]);
+      const combined = [...beforeMsgs.reverse(), ...afterMsgs];
+      return combined.map(toMessageResponse);
+    }
 
     const messages = await prisma.message.findMany({
       where: {
@@ -410,5 +558,146 @@ export class ChannelsService {
     });
 
     return toChannelReadStateResponse(readState);
+  }
+
+  async searchMessages(
+    channelId: string,
+    userId: string,
+    query: string,
+    limit?: number,
+  ) {
+    const channel = await prisma.channel.findUnique({
+      where: { id: channelId },
+    });
+    if (!channel)
+      throw new AppError("Channel not found", 404, "CHANNEL_NOT_FOUND");
+
+    // Check user is a member of the server owning the channel
+    const membership = await prisma.serverMember.findUnique({
+      where: {
+        userId_serverId: { userId, serverId: channel.serverId },
+      },
+    });
+    if (!membership)
+      throw new AppError("Not a server member", 403, "NOT_SERVER_MEMBER");
+
+    const messages = await prisma.message.findMany({
+      where: {
+        channelId,
+        deletedAt: null,
+        content: { contains: query, mode: "insensitive" },
+      },
+      orderBy: { createdAt: "desc" },
+      take: limit ?? 25,
+      include: {
+        author: true,
+        reactions: true,
+        attachments: true,
+        replyTo: {
+          include: {
+            author: { select: { id: true, username: true, avatar: true } },
+          },
+        },
+      },
+    });
+
+    return messages.map(toMessageResponse);
+  }
+
+  async reorder(serverId: string, dto: ReorderChannelsDto, userId: string) {
+    await checkPermission(userId, serverId, Permission.CONFIGURE_CHANNELS);
+
+    // Fetch all server channels to validate against
+    const serverChannels = await prisma.channel.findMany({
+      where: { serverId },
+      select: { id: true, type: true },
+    });
+    const serverChannelMap = new Map(serverChannels.map((c) => [c.id, c]));
+
+    // Validate: all IDs must belong to this server
+    for (const ch of dto.channels) {
+      if (!serverChannelMap.has(ch.id)) {
+        throw new AppError(
+          `Channel ${ch.id} does not belong to this server`,
+          400,
+          "INVALID_CHANNEL",
+        );
+      }
+    }
+
+    // Build a lookup for the incoming payload
+    const payloadMap = new Map(dto.channels.map((c) => [c.id, c]));
+
+    // Validate parentId references
+    for (const ch of dto.channels) {
+      if (ch.parentId) {
+        const parent = serverChannelMap.get(ch.parentId);
+        if (!parent) {
+          throw new AppError(
+            `Parent ${ch.parentId} does not belong to this server`,
+            400,
+            "INVALID_PARENT",
+          );
+        }
+        if (parent.type !== "PARENT") {
+          throw new AppError(
+            `Channel ${ch.parentId} is not a category`,
+            400,
+            "INVALID_PARENT",
+          );
+        }
+      }
+      // Categories cannot have a parent
+      const channelType = serverChannelMap.get(ch.id)!.type;
+      if (channelType === "PARENT" && ch.parentId) {
+        throw new AppError(
+          "Categories cannot be nested inside other categories",
+          400,
+          "INVALID_PARENT",
+        );
+      }
+    }
+
+    // Validate: positions must be contiguous (0..n-1) per parentId group
+    const groups = new Map<string, number[]>();
+    for (const ch of dto.channels) {
+      const key = ch.parentId ?? "__root";
+      const list = groups.get(key) ?? [];
+      list.push(ch.position);
+      groups.set(key, list);
+    }
+    for (const [key, positions] of groups) {
+      const sorted = [...positions].sort((a, b) => a - b);
+      for (let i = 0; i < sorted.length; i++) {
+        if (sorted[i] !== i) {
+          throw new AppError(
+            `Positions must be contiguous (0..n-1) within group ${key}`,
+            400,
+            "INVALID_POSITIONS",
+          );
+        }
+      }
+    }
+
+    await prisma.$transaction(async (tx) => {
+      for (const ch of dto.channels) {
+        await tx.channel.update({
+          where: { id: ch.id },
+          data: { position: ch.position, parentId: ch.parentId },
+        });
+      }
+    });
+
+    const io = getIO();
+    if (io) {
+      io.to(`server:${serverId}`).emit("channels:reordered", {
+        serverId,
+        channels: dto.channels.map((ch) => ({
+          id: ch.id,
+          position: ch.position,
+          parentId: ch.parentId ?? null,
+        })),
+      });
+    }
   }
 }

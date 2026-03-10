@@ -28,6 +28,7 @@ function createMockIO() {
     emit: vi.fn(),
     socketsJoin: vi.fn(),
     socketsLeave: vi.fn(),
+    fetchSockets: vi.fn(async () => []),
   };
   return {
     to: vi.fn(() => chainable),
@@ -170,11 +171,23 @@ describe("Voice Handlers", () => {
       vi.mocked(redis.scard).mockResolvedValue(1); // first joiner
       vi.mocked(redis.smembers).mockResolvedValue(["user-1"]);
 
+      // Mock fetchSockets: first call returns caller sockets, second returns DM room sockets
+      const otherSocket = { id: "other-socket", emit: vi.fn() };
+      io._chainable.fetchSockets
+        .mockResolvedValueOnce([{ id: "caller-socket" }]) // caller's sockets
+        .mockResolvedValueOnce([
+          { id: "caller-socket", emit: socket.emit }, // caller (excluded)
+          otherSocket, // other DM participant
+        ]);
+
       const handler = socket._handlers.get("voice:join");
       await handler!({ dmConversationId: "dm1" });
 
-      // Should emit dm_call_incoming to other DM participants
-      expect(socket.to).toHaveBeenCalledWith("dm:dm1");
+      // Should emit dm_call_incoming to other DM participants (not the caller)
+      expect(otherSocket.emit).toHaveBeenCalledWith("voice:dm_call_incoming", {
+        dmConversationId: "dm1",
+        callerId: "user-1",
+      });
     });
 
     it("should reject if user is not a DM participant", async () => {

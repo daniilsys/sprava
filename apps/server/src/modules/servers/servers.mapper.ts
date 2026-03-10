@@ -8,6 +8,12 @@ type MemberInput = {
   userId: string;
   serverId: string;
   joinedAt: Date;
+  user?: {
+    id: string;
+    username: string;
+    avatar: string | null;
+    memberRoles?: { roleId: string }[];
+  } | null;
 };
 
 type ServerInput = {
@@ -24,6 +30,7 @@ type ServerInput = {
     type: string;
     position: number;
     serverId: string;
+    parentId?: string | null;
     messages?: Array<{ id: string }>;
   }>;
   roles?: Array<{
@@ -33,6 +40,8 @@ type ServerInput = {
     serverId: string;
     permissions: bigint;
     position: number;
+    isWorld: boolean;
+    separate: boolean;
   }>;
   members?: MemberInput[];
 };
@@ -42,6 +51,7 @@ type ServerBanInput = {
   serverId: string;
   reason: string | null;
   bannedAt: Date;
+  user?: { username: string; avatar: string | null };
 };
 
 export function toServerBanResponse(ban: ServerBanInput) {
@@ -50,6 +60,8 @@ export function toServerBanResponse(ban: ServerBanInput) {
     serverId: ban.serverId,
     reason: ban.reason,
     bannedAt: ban.bannedAt,
+    username: ban.user?.username ?? "Unknown",
+    avatar: ban.user?.avatar ?? null,
   };
 }
 
@@ -58,6 +70,14 @@ export function toMemberResponse(member: MemberInput) {
     userId: member.userId,
     serverId: member.serverId,
     joinedAt: member.joinedAt,
+    user: member.user
+      ? {
+          id: member.user.id,
+          username: member.user.username,
+          avatar: member.user.avatar,
+        }
+      : undefined,
+    roleIds: member.user?.memberRoles?.map((mr) => mr.roleId),
   };
 }
 

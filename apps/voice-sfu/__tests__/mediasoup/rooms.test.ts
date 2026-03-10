@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mockRouter, mockWorker } from "../setup.js";
-import { roomProducers } from "../../src/state.js";
+import { roomProducers, roomSpeakerObservers, roomActiveSpeakers } from "../../src/state.js";
 
 // We need to test the rooms module, but it has internal state (a local Map).
 // Re-import fresh each test suite run.
@@ -12,9 +12,17 @@ vi.mock("../../src/mediasoup/workers.js", () => ({
   getNextWorker: vi.fn(() => mockWorker),
 }));
 
+// Mock publisher (rooms.ts now imports publishNotification for AudioLevelObserver)
+vi.mock("../../src/redis/publisher.js", () => ({
+  publishResponse: vi.fn(),
+  publishNotification: vi.fn(),
+}));
+
 describe("rooms", () => {
   beforeEach(() => {
     roomProducers.clear();
+    roomSpeakerObservers.clear();
+    roomActiveSpeakers.clear();
     // Clean up rooms by destroying any that were created
     // (rooms is a local Map inside rooms.ts, so we destroy known rooms)
     if (getRoom("room-1")) destroyRoom("room-1");

@@ -4,6 +4,8 @@ type ChannelInput = {
   type: string;
   position: number;
   serverId: string;
+  parentId?: string | null;
+  syncParentRules?: boolean;
   messages?: Array<{ id: string }>;
 };
 
@@ -29,6 +31,8 @@ export function toChannelResponse(channel: ChannelInput) {
     type: channel.type,
     position: channel.position,
     serverId: channel.serverId,
+    parentId: channel.parentId ?? null,
+    syncParentRules: channel.syncParentRules ?? true,
     lastMessageId: channel.messages?.[0]?.id ?? null,
   };
 }

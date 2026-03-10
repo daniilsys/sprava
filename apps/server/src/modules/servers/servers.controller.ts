@@ -52,11 +52,13 @@ export class ServersController {
 
   async getMembers(req: Request, res: Response, next: NextFunction) {
     try {
-      const members = await serversService.getMembers(
+      const { cursor, limit } = req.query as { cursor?: string; limit?: number | undefined };
+      const result = await serversService.getMembers(
         req.params.id.toString(),
         req.userId,
+        { cursor, limit: limit ?? undefined },
       );
-      res.json(members);
+      res.json(result);
     } catch (err) {
       next(err);
     }
@@ -97,11 +99,26 @@ export class ServersController {
 
   async getBans(req: Request, res: Response, next: NextFunction) {
     try {
-      const bans = await serversService.getBans(
+      const { cursor, limit } = req.query as { cursor?: string; limit?: number | undefined };
+      const result = await serversService.getBans(
         req.params.id.toString(),
         req.userId,
+        { cursor, limit: limit ?? undefined },
       );
-      res.json(bans);
+      res.json(result);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async kickMember(req: Request, res: Response, next: NextFunction) {
+    try {
+      await serversService.kickMember(
+        req.params.id.toString(),
+        req.params.userId.toString(),
+        req.userId!,
+      );
+      res.status(204).send();
     } catch (err) {
       next(err);
     }
@@ -112,8 +129,8 @@ export class ServersController {
       await serversService.banMember(
         req.params.id.toString(),
         req.params.userId.toString(),
+        req.userId!,
         req.body.reason,
-        req.userId,
       );
       res.status(204).send();
     } catch (err) {
@@ -126,9 +143,30 @@ export class ServersController {
       await serversService.unbanMember(
         req.params.id.toString(),
         req.params.userId.toString(),
-        req.userId,
+        req.userId!,
       );
       res.status(204).send();
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async preview(req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await serversService.preview(req.params.code as string);
+      res.json(result);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async regenerateInviteCode(req: Request, res: Response, next: NextFunction) {
+    try {
+      const server = await serversService.regenerateInviteCode(
+        req.params.id.toString(),
+        req.userId,
+      );
+      res.json(server);
     } catch (err) {
       next(err);
     }

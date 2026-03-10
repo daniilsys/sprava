@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { handleProduce } from "../../src/handlers/produce.js";
 import { publishResponse, publishNotification } from "../../src/redis/publisher.js";
-import { userTransports, userProducers, userRooms, roomProducers } from "../../src/state.js";
-import { mockTransport, mockProducer } from "../setup.js";
+import { transports, userProducers, userRooms, roomProducers } from "../../src/state.js";
+import { mockSendTransport, mockProducer } from "../setup.js";
 import type { VoiceCommand } from "../../src/redis/subscriber.js";
 
 vi.mock("../../src/redis/publisher.js", () => ({
@@ -16,7 +16,7 @@ const makeCmd = (overrides?: Partial<VoiceCommand>): VoiceCommand => ({
   roomId: "channel:ch1",
   userId: "user-1",
   payload: {
-    transportId: "transport-1",
+    transportId: mockSendTransport.id,
     kind: "audio",
     rtpParameters: { codecs: [], headerExtensions: [], encodings: [], rtcp: {} },
   },
@@ -25,18 +25,18 @@ const makeCmd = (overrides?: Partial<VoiceCommand>): VoiceCommand => ({
 
 describe("handleProduce", () => {
   beforeEach(() => {
-    userTransports.clear();
+    transports.clear();
     userProducers.clear();
     userRooms.clear();
     roomProducers.clear();
   });
 
   it("creates a producer and stores it per-user and per-room", async () => {
-    userTransports.set("user-1", mockTransport as any);
+    transports.set(mockSendTransport.id, mockSendTransport as any);
 
     await handleProduce(makeCmd());
 
-    expect(mockTransport.produce).toHaveBeenCalledWith({
+    expect(mockSendTransport.produce).toHaveBeenCalledWith({
       kind: "audio",
       rtpParameters: expect.any(Object),
     });
@@ -45,7 +45,7 @@ describe("handleProduce", () => {
   });
 
   it("publishes NEW_PRODUCER notification", async () => {
-    userTransports.set("user-1", mockTransport as any);
+    transports.set(mockSendTransport.id, mockSendTransport as any);
 
     await handleProduce(makeCmd());
 
@@ -58,7 +58,7 @@ describe("handleProduce", () => {
   });
 
   it("responds with producerId", async () => {
-    userTransports.set("user-1", mockTransport as any);
+    transports.set(mockSendTransport.id, mockSendTransport as any);
 
     await handleProduce(makeCmd());
 
@@ -78,7 +78,7 @@ describe("handleProduce", () => {
   });
 
   it("appends to existing producers list", async () => {
-    userTransports.set("user-1", mockTransport as any);
+    transports.set(mockSendTransport.id, mockSendTransport as any);
     const existingProducer = { id: "old-prod", kind: "video", close: vi.fn() } as any;
     userProducers.set("user-1", [existingProducer]);
 

@@ -110,8 +110,8 @@ export class RolesController {
     try {
       const roles = await service.getMemberRoles(
         req.params.serverId.toString(),
-        req.params.userId.toString(),
         req.userId!,
+        req.params.memberId.toString(),
       );
       res.json(roles);
     } catch (err) {

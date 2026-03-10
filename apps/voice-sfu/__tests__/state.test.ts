@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import {
-  userTransports,
+  transports,
+  userTransportIds,
   userProducers,
   userConsumers,
   userRooms,
@@ -9,17 +10,23 @@ import {
 
 describe("state maps", () => {
   beforeEach(() => {
-    userTransports.clear();
+    transports.clear();
+    userTransportIds.clear();
     userProducers.clear();
     userConsumers.clear();
     userRooms.clear();
     roomProducers.clear();
   });
 
-  it("userTransports stores and retrieves transports", () => {
+  it("transports stores and retrieves by transportId", () => {
     const transport = { id: "t1" } as any;
-    userTransports.set("user-1", transport);
-    expect(userTransports.get("user-1")).toBe(transport);
+    transports.set("t1", transport);
+    expect(transports.get("t1")).toBe(transport);
+  });
+
+  it("userTransportIds maps userId to transport IDs", () => {
+    userTransportIds.set("user-1", ["send-t1", "recv-t1"]);
+    expect(userTransportIds.get("user-1")).toEqual(["send-t1", "recv-t1"]);
   });
 
   it("userProducers stores arrays of producers", () => {

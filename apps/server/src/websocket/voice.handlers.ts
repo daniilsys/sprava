@@ -73,16 +73,95 @@ export async function leaveVoiceRoom(
 
   io.to(`voice:${roomId}`).emit("voice:user_left", { userId, roomId });
 
-  // DM call: notify participants if the call is now empty
+  // Also notify all server members for real-time voice state updates
+  if (roomId.startsWith("channel:")) {
+    const channelId = roomId.slice(8); // "channel:".length === 8
+    const ch = await prisma.channel.findUnique({
+      where: { id: channelId },
+      select: { serverId: true },
+    });
+    if (ch) {
+      io.to(`server:${ch.serverId}`).emit("voice:user_left", { userId, roomId });
+    }
+  }
+
+  // DM call: notify DM room participants + clean up ring timer
   if (roomId.startsWith("dm:")) {
     const dmConversationId = roomId.slice(3);
+    // Notify all DM participants (not just voice members) so sidebar shows call state
+    io.to(`dm:${dmConversationId}`).emit("voice:user_left", { userId, roomId });
+
+    clearDmRingTimer(roomId);
     const remaining = await redis.scard(roomMembersKey(roomId));
     if (remaining === 0) {
+      clearDmAloneTimer(roomId);
       io.to(`dm:${dmConversationId}`).emit("voice:dm_call_ended", {
         dmConversationId,
       });
+    } else if (remaining === 1) {
+      // Last person alone — kick after 1 minute
+      startDmAloneTimer(io, roomId);
     }
   }
+}
+
+// ─── DM call ring timeout (20s) ─────────────────────────────────────────────
+
+const DM_RING_TIMEOUT_MS = 20_000;
+const dmRingTimers = new Map<string, ReturnType<typeof setTimeout>>(); // roomId → timer
+
+function clearDmRingTimer(roomId: string) {
+  const timer = dmRingTimers.get(roomId);
+  if (timer) {
+    clearTimeout(timer);
+    dmRingTimers.delete(roomId);
+  }
+}
+
+// ─── DM call alone timeout (60s) — kick last user if alone for 1 minute ─────
+
+const DM_ALONE_TIMEOUT_MS = 60_000;
+const dmAloneTimers = new Map<string, ReturnType<typeof setTimeout>>(); // roomId → timer
+
+export function clearDmAloneTimer(roomId: string) {
+  const timer = dmAloneTimers.get(roomId);
+  if (timer) {
+    clearTimeout(timer);
+    dmAloneTimers.delete(roomId);
+  }
+}
+
+export async function startDmAloneTimer(io: Server, roomId: string) {
+  clearDmAloneTimer(roomId);
+  dmAloneTimers.set(
+    roomId,
+    setTimeout(async () => {
+      dmAloneTimers.delete(roomId);
+      const members = await redis.smembers(roomMembersKey(roomId));
+      if (members.length !== 1) return;
+      const aloneUserId = members[0];
+
+      // Clean up: SFU leave, Redis state, socket room
+      try { await rpcToSfu("LEAVE", roomId, aloneUserId); } catch { /* SFU self-cleans */ }
+      await Promise.all([
+        redis.del(userVoiceKey(aloneUserId)),
+        redis.srem(roomMembersKey(roomId), aloneUserId),
+      ]);
+
+      const dmConversationId = roomId.slice(3);
+      io.to(`voice:${roomId}`).emit("voice:user_left", { userId: aloneUserId, roomId });
+      io.to(`dm:${dmConversationId}`).emit("voice:user_left", { userId: aloneUserId, roomId });
+      io.to(`dm:${dmConversationId}`).emit("voice:dm_call_ended", { dmConversationId });
+
+      // Remove user's sockets from the voice room + notify them
+      const sockets = await io.in(`user:${aloneUserId}`).fetchSockets();
+      for (const s of sockets) {
+        s.leave(`voice:${roomId}`);
+        s.emit("voice:left");
+        s.emit("voice:alone_timeout");
+      }
+    }, DM_ALONE_TIMEOUT_MS),
+  );
 }
 
 // ─── Handler registration ─────────────────────────────────────────────────────
@@ -96,6 +175,7 @@ export function registerVoiceHandlers(io: Server, socket: Socket): void {
     async (payload: { channelId?: string; dmConversationId?: string }) => {
       try {
         let roomId: string;
+        let serverId: string | null = null;
 
         if (payload.channelId) {
           const channel = await prisma.channel.findUnique({
@@ -116,6 +196,7 @@ export function registerVoiceHandlers(io: Server, socket: Socket): void {
             payload.channelId,
           );
           roomId = `channel:${payload.channelId}`;
+          serverId = channel.serverId;
         } else if (payload.dmConversationId) {
           const participant = await prisma.dmParticipant.findUnique({
             where: {
@@ -152,7 +233,8 @@ export function registerVoiceHandlers(io: Server, socket: Socket): void {
 
         // RPC: JOIN → SFU creates/retrieves Router + WebRtcTransport
         const joinResult = await rpcToSfu<{
-          transportParams: unknown;
+          sendTransportOptions: unknown;
+          recvTransportOptions: unknown;
           routerRtpCapabilities: unknown;
           existingProducers: unknown[];
         }>("JOIN", roomId, userId);
@@ -170,21 +252,67 @@ export function registerVoiceHandlers(io: Server, socket: Socket): void {
 
         await socket.join(`voice:${roomId}`);
 
-        // Notify others already in the room
+        // Notify others already in the voice room
         socket.to(`voice:${roomId}`).emit("voice:user_joined", {
           userId,
           roomId,
         });
+
+        // Also notify all server members so they see voice state updates
+        if (serverId) {
+          socket.to(`server:${serverId}`).emit("voice:user_joined", {
+            userId,
+            roomId,
+          });
+        }
+
+        // Also notify all DM participants so sidebar shows call active state
+        if (roomId.startsWith("dm:")) {
+          const dmConversationId = roomId.slice(3);
+          socket.to(`dm:${dmConversationId}`).emit("voice:user_joined", {
+            userId,
+            roomId,
+          });
+        }
 
         // DM call: first joiner triggers an incoming-call notification to other DM participants
         if (roomId.startsWith("dm:")) {
           const dmConversationId = payload.dmConversationId!;
           const roomSize = await redis.scard(roomMembersKey(roomId));
           if (roomSize === 1) {
-            socket.to(`dm:${dmConversationId}`).emit("voice:dm_call_incoming", {
-              dmConversationId,
-              callerId: userId,
-            });
+            // Broadcast to DM room but exclude ALL sockets of the caller
+            // (socket.to() only excludes the current socket, not other instances)
+            const callerSockets = await io.in(`user:${userId}`).fetchSockets();
+            const callerSocketIds = new Set(callerSockets.map((s) => s.id));
+
+            const dmSockets = await io.in(`dm:${dmConversationId}`).fetchSockets();
+            for (const s of dmSockets) {
+              if (!callerSocketIds.has(s.id)) {
+                s.emit("voice:dm_call_incoming", {
+                  dmConversationId,
+                  callerId: userId,
+                });
+              }
+            }
+
+            // Start ring timeout — if nobody joins in 20s, disconnect the caller
+            clearDmRingTimer(roomId);
+            dmRingTimers.set(
+              roomId,
+              setTimeout(async () => {
+                dmRingTimers.delete(roomId);
+                const currentSize = await redis.scard(roomMembersKey(roomId));
+                if (currentSize <= 1) {
+                  await leaveVoiceRoom(io, socket, userId, roomId);
+                  socket.emit("voice:left");
+                  socket.emit("voice:ring_timeout");
+                }
+              }, DM_RING_TIMEOUT_MS),
+            );
+          } else {
+            // Someone joined an existing call — cancel the ring timer and alone timer
+            clearDmRingTimer(roomId);
+            clearDmAloneTimer(roomId);
           }
         }
 
@@ -213,6 +341,62 @@ export function registerVoiceHandlers(io: Server, socket: Socket): void {
     await leaveVoiceRoom(io, socket, userId, roomId);
     socket.emit("voice:left");
   });
+
+  // ── voice:mute_state ──────────────────────────────────────────────────────
+  socket.on(
+    "voice:mute_state",
+    async (payload: { muted: boolean }) => {
+      const currentRaw = await redis.get(userVoiceKey(userId));
+      if (!currentRaw) return;
+      const { roomId } = JSON.parse(currentRaw) as StoredVoiceState;
+      socket.to(`voice:${roomId}`).emit("voice:mute_state", {
+        userId,
+        muted: payload.muted,
+      });
+    },
+  );
+
+  // ── voice:deafen_state ─────────────────────────────────────────────────────
+  socket.on(
+    "voice:deafen_state",
+    async (payload: { deafened: boolean }) => {
+      const currentRaw = await redis.get(userVoiceKey(userId));
+      if (!currentRaw) return;
+      const { roomId } = JSON.parse(currentRaw) as StoredVoiceState;
+      socket.to(`voice:${roomId}`).emit("voice:deafen_state", {
+        userId,
+        deafened: payload.deafened,
+      });
+    },
+  );
+
+  // ── voice:video_start ─────────────────────────────────────────────────────
+  socket.on(
+    "voice:video_start",
+    async (payload: { kind: "camera" | "screen" }) => {
+      const currentRaw = await redis.get(userVoiceKey(userId));
+      if (!currentRaw) return;
+      const { roomId } = JSON.parse(currentRaw) as StoredVoiceState;
+      socket.to(`voice:${roomId}`).emit("voice:video_start", {
+        userId,
+        kind: payload.kind,
+      });
+    },
+  );
+
+  // ── voice:video_stop ──────────────────────────────────────────────────────
+  socket.on(
+    "voice:video_stop",
+    async (payload: { kind: "camera" | "screen" }) => {
+      const currentRaw = await redis.get(userVoiceKey(userId));
+      if (!currentRaw) return;
+      const { roomId } = JSON.parse(currentRaw) as StoredVoiceState;
+      socket.to(`voice:${roomId}`).emit("voice:video_stop", {
+        userId,
+        kind: payload.kind,
+      });
+    },
+  );
 
   // ── voice:connect_transport ────────────────────────────────────────────────
   socket.on(
@@ -293,6 +477,57 @@ export function registerVoiceHandlers(io: Server, socket: Socket): void {
       } catch (err) {
         const message = err instanceof Error ? err.message : "Unknown error";
         socket.emit("voice:error", { code: "CONSUME_FAILED", message });
+      }
+    },
+  );
+
+  // ── voice:set_preferred_layers ──────────────────────────────────────────────
+  socket.on(
+    "voice:set_preferred_layers",
+    async (payload: { consumerId: string; spatialLayer: number; temporalLayer?: number }) => {
+      const currentRaw = await redis.get(userVoiceKey(userId));
+      if (!currentRaw) return;
+      const { roomId } = JSON.parse(currentRaw) as StoredVoiceState;
+      try {
+        await rpcToSfu("SET_PREFERRED_LAYERS", roomId, userId, payload);
+        socket.emit("voice:layers_ok");
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Unknown error";
+        socket.emit("voice:error", { code: "SET_LAYERS_FAILED", message });
+      }
+    },
+  );
+
+  // ── voice:pause_consumer ────────────────────────────────────────────────────
+  socket.on(
+    "voice:pause_consumer",
+    async (payload: { consumerId: string; pause: boolean }) => {
+      const currentRaw = await redis.get(userVoiceKey(userId));
+      if (!currentRaw) return;
+      const { roomId } = JSON.parse(currentRaw) as StoredVoiceState;
+      try {
+        await rpcToSfu("PAUSE_CONSUMER", roomId, userId, payload);
+        socket.emit("voice:pause_ok");
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Unknown error";
+        socket.emit("voice:error", { code: "PAUSE_FAILED", message });
+      }
+    },
+  );
+
+  // ── voice:resume_consumer ───────────────────────────────────────────────────
+  socket.on(
+    "voice:resume_consumer",
+    async (payload: { consumerId: string }) => {
+      const currentRaw = await redis.get(userVoiceKey(userId));
+      if (!currentRaw) return;
+      const { roomId } = JSON.parse(currentRaw) as StoredVoiceState;
+      try {
+        await rpcToSfu("RESUME_CONSUMER", roomId, userId, payload);
+        socket.emit("voice:resume_ok");
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Unknown error";
+        socket.emit("voice:error", { code: "RESUME_FAILED", message });
       }
     },
   );

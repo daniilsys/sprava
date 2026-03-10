@@ -66,6 +66,15 @@ export interface SocketChannel {
   lastMessageId?: string | null;
 }
 
+export interface SocketChannelRule {
+  id: string;
+  channelId: string;
+  roleId: string | null;
+  memberId: string | null;
+  allow: string; // BigInt serialized as string
+  deny: string;  // BigInt serialized as string
+}
+
 export interface SocketRole {
   id: string;
   name: string;
@@ -73,12 +82,16 @@ export interface SocketRole {
   serverId: string;
   permissions: string; // BigInt serialized as string
   position: number;
+  isWorld?: boolean;
+  separate?: boolean;
 }
 
 export interface SocketMember {
   userId: string;
   serverId: string;
   joinedAt: Date;
+  user?: SocketUser;
+  roleIds?: string[];
 }
 
 export interface SocketServer {
@@ -151,6 +164,20 @@ export interface ServerToClientEvents {
   /** A channel was deleted. */
   "channel:deleted": (payload: { channelId: string; serverId: string }) => void;
 
+  /** A channel permission rule was created or updated. */
+  "channel:rule_updated": (payload: {
+    serverId: string;
+    rule: SocketChannelRule;
+  }) => void;
+
+  /** A channel permission rule was deleted. */
+  "channel:rule_deleted": (payload: {
+    serverId: string;
+    channelId: string;
+    roleId: string | null;
+    memberId: string | null;
+  }) => void;
+
   /** A new message was posted in a channel. */
   "channel:message_new": (payload: { message: SocketMessage }) => void;
 
@@ -187,6 +214,19 @@ export interface ServerToClientEvents {
     messageId: string;
     channelId: string;
     reaction: SocketReaction;
+  }) => void;
+
+  /** A message was pinned in a channel. */
+  "channel:message_pinned": (payload: {
+    channelId: string;
+    messageId: string;
+    pinnedBy: string;
+  }) => void;
+
+  /** A message was unpinned in a channel. */
+  "channel:message_unpinned": (payload: {
+    channelId: string;
+    messageId: string;
   }) => void;
 
   // ── Direct messages ───────────────────────────────────────────────────────
@@ -235,6 +275,19 @@ export interface ServerToClientEvents {
     reaction: SocketReaction;
   }) => void;
 
+  /** A message was pinned in a DM conversation. */
+  "dm:message_pinned": (payload: {
+    dmConversationId: string;
+    messageId: string;
+    pinnedBy: string;
+  }) => void;
+
+  /** A message was unpinned in a DM conversation. */
+  "dm:message_unpinned": (payload: {
+    dmConversationId: string;
+    messageId: string;
+  }) => void;
+
   // ── Servers ───────────────────────────────────────────────────────────────
 
   /** A user joined a server. */
@@ -259,7 +312,16 @@ export interface ServerToClientEvents {
   // ── Users ─────────────────────────────────────────────────────────────────
 
   /** A user's online/offline status changed. */
-  "user:presence": (payload: { userId: string; online: boolean }) => void;
+  "user:presence": (payload: { userId: string; status: string; statusMessage: string }) => void;
+
+  /** Lightweight unread notification for unfocused channels. */
+  "channel:unread_update": (payload: { channelId: string; messageId: string; authorId: string }) => void;
+
+  /** Paginated member chunk in response to server:request_members. */
+  "server:members_chunk": (payload: { serverId: string; members: SocketMember[]; cursor: string | null }) => void;
+
+  /** Current presence states for subscribed users. */
+  "presence:state": (payload: { states: Record<string, { status: string; statusMessage: string }> }) => void;
 
   // ── Voice ─────────────────────────────────────────────────────────────────
 
@@ -312,6 +374,12 @@ export interface ServerToClientEvents {
 
   /** The DM voice call ended (no more participants). */
   "voice:dm_call_ended": (payload: { dmConversationId: string }) => void;
+
+  /** A user started sharing video (camera or screen). */
+  "voice:video_start": (payload: { userId: string; kind: "camera" | "screen" }) => void;
+
+  /** A user stopped sharing video (camera or screen). */
+  "voice:video_stop": (payload: { userId: string; kind: "camera" | "screen" }) => void;
 }
 
 // ─── Client → Server events ───────────────────────────────────────────────────
@@ -340,6 +408,21 @@ export interface ClientToServerEvents {
     dmConversationId: string;
     lastReadMessageId: string;
   }) => void;
+
+  /** Subscribe to presence updates for specific users (max 200 per call). */
+  "presence:subscribe": (payload: { userIds: string[] }) => void;
+
+  /** Unsubscribe from presence updates for specific users. */
+  "presence:unsubscribe": (payload: { userIds: string[] }) => void;
+
+  /** Tell server which channel the client is currently viewing. */
+  "channel:focus": (payload: { channelId: string | null }) => void;
+
+  /** Request paginated members for a server. */
+  "server:request_members": (payload: { serverId: string; cursor?: string }) => void;
+
+  /** Set user status. */
+  "user:set_status": (payload: { status: string; statusMessage?: string }) => void;
 
   // ── Voice ─────────────────────────────────────────────────────────────────
 
@@ -370,6 +453,12 @@ export interface ClientToServerEvents {
     producerId: string;
     rtpCapabilities: unknown;
   }) => void;
+
+  /** Client started sharing video (camera or screen). */
+  "voice:video_start": (data: { kind: "camera" | "screen" }) => void;
+
+  /** Client stopped sharing video (camera or screen). */
+  "voice:video_stop": (data: { kind: "camera" | "screen" }) => void;
 }
 
 // ─── Event name constants ─────────────────────────────────────────────────────
@@ -388,12 +477,16 @@ export const SocketEvent = {
   CHANNEL_CREATED: "channel:created",
   CHANNEL_UPDATED: "channel:updated",
   CHANNEL_DELETED: "channel:deleted",
+  CHANNEL_RULE_UPDATED: "channel:rule_updated",
+  CHANNEL_RULE_DELETED: "channel:rule_deleted",
   CHANNEL_MESSAGE_NEW: "channel:message_new",
   CHANNEL_MESSAGE_EDIT: "channel:message_edit",
   CHANNEL_MESSAGE_DELETE: "channel:message_delete",
   CHANNEL_TYPING: "channel:typing",
   CHANNEL_REACTION_ADD: "channel:reaction_add",
   CHANNEL_REACTION_REMOVE: "channel:reaction_remove",
+  CHANNEL_MESSAGE_PINNED: "channel:message_pinned",
+  CHANNEL_MESSAGE_UNPINNED: "channel:message_unpinned",
 
   DM_CREATED: "dm:created",
   DM_MESSAGE_NEW: "dm:message_new",
@@ -402,12 +495,23 @@ export const SocketEvent = {
   DM_TYPING: "dm:typing",
   DM_REACTION_ADD: "dm:reaction_add",
   DM_REACTION_REMOVE: "dm:reaction_remove",
+  DM_MESSAGE_PINNED: "dm:message_pinned",
+  DM_MESSAGE_UNPINNED: "dm:message_unpinned",
 
   SERVER_MEMBER_JOIN: "server:member_join",
   SERVER_MEMBER_LEAVE: "server:member_leave",
   SERVER_OWNERSHIP_TRANSFERRED: "server:ownership_transferred",
 
   USER_PRESENCE: "user:presence",
+  CHANNEL_UNREAD_UPDATE: "channel:unread_update",
+  SERVER_MEMBERS_CHUNK: "server:members_chunk",
+  PRESENCE_STATE: "presence:state",
+
+  PRESENCE_SUBSCRIBE: "presence:subscribe",
+  PRESENCE_UNSUBSCRIBE: "presence:unsubscribe",
+  CHANNEL_FOCUS: "channel:focus",
+  SERVER_REQUEST_MEMBERS: "server:request_members",
+  USER_SET_STATUS: "user:set_status",
 
   TYPING_START: "typing:start",
   TYPING_STOP: "typing:stop",
@@ -431,6 +535,8 @@ export const SocketEvent = {
   VOICE_CONNECT_TRANSPORT: "voice:connect_transport",
   VOICE_PRODUCE: "voice:produce",
   VOICE_CONSUME_REQUEST: "voice:consume_request",
+  VOICE_VIDEO_START: "voice:video_start",
+  VOICE_VIDEO_STOP: "voice:video_stop",
 } as const satisfies Record<string, keyof ServerToClientEvents | keyof ClientToServerEvents>;
 
 export type SocketEventName = (typeof SocketEvent)[keyof typeof SocketEvent];

@@ -9,6 +9,14 @@ import {
 } from "./dm.mapper.js";
 import { toMessageResponse } from "../messages/messages.mapper.js";
 
+const participantsInclude = {
+  participants: {
+    include: {
+      user: { select: { id: true, username: true, avatar: true } },
+    },
+  },
+} as const;
+
 export class DmService {
   async create(dto: CreateDmDto, userId: string) {
     // participantIds includes the creator — group = 3+ total, 1-1 = exactly 2
@@ -108,7 +116,7 @@ export class DmService {
           { participants: { some: { userId: participantId } } },
         ],
       },
-      include: { participants: true },
+      include: participantsInclude,
     });
 
     if (existingDm && existingDm.participants.length === 2) {
@@ -143,7 +151,7 @@ export class DmService {
   async getDmConversations(userId: string) {
     const dms = await prisma.dmConversation.findMany({
       where: { participants: { some: { userId } } },
-      include: { participants: true },
+      include: participantsInclude,
       orderBy: { createdAt: "desc" },
     });
     return dms.map(toDmResponse);
@@ -152,7 +160,7 @@ export class DmService {
   async sendMessage(dmId: string, dto: SendMessageDto, userId: string) {
     const dm = await prisma.dmConversation.findUnique({
       where: { id: dmId },
-      include: { participants: true },
+      include: participantsInclude,
     });
 
     if (!dm) throw new AppError("DM not found", 404, "DM_NOT_FOUND");
@@ -172,9 +180,15 @@ export class DmService {
           content: dto.content ?? "",
           authorId: userId,
           dmConversationId: dmId,
+          ...(dto.replyToId ? { replyToId: dto.replyToId } : {}),
         },
         include: {
           author: { select: { id: true, username: true, avatar: true } },
+          replyTo: {
+            include: {
+              author: { select: { id: true, username: true, avatar: true } },
+            },
+          },
         },
       });
 
@@ -215,10 +229,81 @@ export class DmService {
     userId: string,
     before?: string,
     limit?: number,
+    around?: string,
   ) {
     const dm = await prisma.dmConversation.findUnique({
       where: { id: dmId },
-      include: { participants: true },
+      include: participantsInclude,
+    });
+
+    if (!dm) throw new AppError("DM not found", 404, "DM_NOT_FOUND");
+
+    const isParticipant = dm.participants.some((p) => p.userId === userId);
+    if (!isParticipant)
+      throw new AppError(
+        "You are not a participant of this DM",
+        403,
+        "NOT_DM_PARTICIPANT",
+      );
+
+    if (around) {
+      const half = Math.floor((limit ?? 50) / 2);
+      const [beforeMsgs, afterMsgs] = await Promise.all([
+        prisma.message.findMany({
+          where: { dmConversationId: dmId, deletedAt: null, id: { lt: around } },
+          orderBy: { createdAt: "desc" },
+          take: half,
+          include: {
+            author: true, reactions: true, attachments: true,
+            replyTo: { include: { author: { select: { id: true, username: true, avatar: true } } } },
+          },
+        }),
+        prisma.message.findMany({
+          where: { dmConversationId: dmId, deletedAt: null, id: { gte: around } },
+          orderBy: { createdAt: "asc" },
+          take: half + 1,
+          include: {
+            author: true, reactions: true, attachments: true,
+            replyTo: { include: { author: { select: { id: true, username: true, avatar: true } } } },
+          },
+        }),
+      ]);
+      const combined = [...beforeMsgs.reverse(), ...afterMsgs];
+      return combined.map(toMessageResponse);
+    }
+
+    const messages = await prisma.message.findMany({
+      where: {
+        dmConversationId: dmId,
+        deletedAt: null,
+        ...(before && { id: { lt: before } }),
+      },
+      orderBy: { createdAt: "desc" },
+      take: limit ?? 50,
+      include: {
+        author: true,
+        reactions: true,
+        attachments: true,
+        replyTo: {
+          include: {
+            author: { select: { id: true, username: true, avatar: true } },
+          },
+        },
+      },
+    });
+
+    return messages.map(toMessageResponse).reverse();
+  }
+
+  async searchMessages(
+    dmId: string,
+    userId: string,
+    query: string,
+    limit?: number,
+  ) {
+    const dm = await prisma.dmConversation.findUnique({
+      where: { id: dmId },
+      include: participantsInclude,
     });
 
     if (!dm) throw new AppError("DM not found", 404, "DM_NOT_FOUND");
@@ -235,10 +320,10 @@ export class DmService {
       where: {
         dmConversationId: dmId,
         deletedAt: null,
-        ...(before && { id: { lt: before } }),
+        content: { contains: query, mode: "insensitive" },
       },
       orderBy: { createdAt: "desc" },
-      take: limit ?? 50,
+      take: limit ?? 25,
       include: {
         author: true,
         reactions: true,
@@ -282,13 +367,21 @@ export class DmService {
         ...(dto.icon !== undefined ? { icon: dto.icon } : {}),
       },
     });
+
+    const io = getIO();
+    if (io) {
+      io.to(`dm:${dmId}`).emit("dm:updated", {
+        dm: { id: updated.id, name: updated.name, icon: updated.icon },
+      });
+    }
+
     return toDmResponse(updated);
   }
 
   async leaveGroup(dmId: string, userId: string) {
     const dm = await prisma.dmConversation.findUnique({
       where: { id: dmId, type: "GROUP" },
-      include: { participants: true },
+      include: participantsInclude,
     });
 
     if (!dm) throw new AppError("DM not found", 404, "DM_NOT_FOUND");
@@ -300,6 +393,12 @@ export class DmService {
         403,
         "NOT_DM_PARTICIPANT",
       );
+
+    const io = getIO();
+    if (io) {
+      io.to(`dm:${dmId}`).emit("dm:participant_left", { dmConversationId: dmId, userId });
+      io.in(`user:${userId}`).socketsLeave(`dm:${dmId}`);
+    }
 
     await prisma.dmParticipant.deleteMany({
       where: { userId, dmConversationId: dmId },
@@ -326,7 +425,7 @@ export class DmService {
   async removeParticipant(dmId: string, participantId: string, userId: string) {
     const dm = await prisma.dmConversation.findUnique({
       where: { id: dmId, type: "GROUP" },
-      include: { participants: true },
+      include: participantsInclude,
     });
 
     if (!dm) throw new AppError("DM not found", 404, "DM_NOT_FOUND");
@@ -348,6 +447,12 @@ export class DmService {
         "PARTICIPANT_NOT_FOUND",
       );
 
+    const io = getIO();
+    if (io) {
+      io.to(`dm:${dmId}`).emit("dm:participant_removed", { dmConversationId: dmId, userId: participantId });
+      io.in(`user:${participantId}`).socketsLeave(`dm:${dmId}`);
+    }
+
     await prisma.dmParticipant.deleteMany({
       where: { userId: participantId, dmConversationId: dmId },
     });
@@ -358,7 +463,7 @@ export class DmService {
   async addParticipant(dmId: string, participantId: string, userId: string) {
     const dm = await prisma.dmConversation.findUnique({
       where: { id: dmId, type: "GROUP" },
-      include: { participants: true },
+      include: participantsInclude,
     });
 
     if (!dm) throw new AppError("DM not found", 404, "DM_NOT_FOUND");
@@ -390,6 +495,21 @@ export class DmService {
     await prisma.dmParticipant.create({
       data: { userId: participantId, dmConversationId: dmId },
     });
+
+    const io = getIO();
+    if (io) {
+      io.in(`user:${participantId}`).socketsJoin(`dm:${dmId}`);
+      const participant = await prisma.dmParticipant.findFirst({
+        where: { userId: participantId, dmConversationId: dmId },
+        include: { user: { select: { id: true, username: true, avatar: true } } },
+      });
+      io.to(`dm:${dmId}`).emit("dm:participant_added", {
+        dmConversationId: dmId,
+        participant: participant
+          ? { userId: participant.userId, user: participant.user }
+          : { userId: participantId },
+      });
+    }
 
     return { message: "Participant added successfully", participantId };
   }

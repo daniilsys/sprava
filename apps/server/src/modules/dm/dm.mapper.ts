@@ -1,6 +1,11 @@
 type DmParticipantInput = {
   userId: string;
   dmConversationId: string;
+  user?: {
+    id: string;
+    username: string;
+    avatar: string | null;
+  } | null;
 };
 
 type DmInput = {
@@ -34,6 +39,13 @@ export function toDmParticipantResponse(participant: DmParticipantInput) {
   return {
     userId: participant.userId,
     dmConversationId: participant.dmConversationId,
+    user: participant.user
+      ? {
+          id: participant.user.id,
+          username: participant.user.username,
+          avatar: participant.user.avatar,
+        }
+      : undefined,
   };
 }
 

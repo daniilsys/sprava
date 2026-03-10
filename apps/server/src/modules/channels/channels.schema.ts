@@ -21,12 +21,15 @@ export const createChannelSchema = z.object({
   name: z.string().min(1).max(100),
   type: z.enum(["TEXT", "VOICE", "PARENT", "ANNOUNCEMENT"]),
   serverId: z.string(),
+  parentId: z.string().optional(),
 });
 
 export const updateChannelSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   type: z.enum(["TEXT", "VOICE", "PARENT", "ANNOUNCEMENT"]).optional(),
   position: z.number().optional(),
+  parentId: z.string().nullable().optional(),
+  syncParentRules: z.boolean().optional(),
 });
 
 const attachmentItemSchema = z.object({
@@ -40,6 +43,7 @@ export const sendMessageSchema = z
   .object({
     content: z.string().max(2000).optional(),
     attachments: z.array(attachmentItemSchema).max(10).optional(),
+    replyToId: z.string().optional(),
   })
   .refine(
     (d) =>
@@ -76,4 +80,19 @@ export const markReadSchema = z.object({
   lastReadMessageId: z.string().min(1),
 });
 
+export const reorderChannelsSchema = z.object({
+  channels: z.array(z.object({
+    id: z.string(),
+    position: z.number().int().min(0),
+    parentId: z.string().nullable(),
+  })),
+});
+
+export const searchMessagesSchema = z.object({
+  q: z.string().min(1).max(200),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+});
+
+export type ReorderChannelsDto = z.infer<typeof reorderChannelsSchema>;
 export type MarkReadDto = z.infer<typeof markReadSchema>;
+export type SearchMessagesDto = z.infer<typeof searchMessagesSchema>;

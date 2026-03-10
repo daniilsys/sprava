@@ -66,9 +66,24 @@ describe("Permission System", () => {
         { role: makeRole({ permissions: 1n }) },
         { role: makeRole({ permissions: 2n }) },
       ] as any);
+      vi.mocked(prisma.role.findFirst).mockResolvedValue(null); // no @world role
 
       const perms = await getEffectivePermissions("user-1", "server-1");
       expect(perms).toBe(3n); // 1n | 2n
+    });
+
+    it("should include @world permissions for member with no roles", async () => {
+      vi.mocked(prisma.server.findUnique).mockResolvedValue(
+        makeServer({ ownerId: "other" }) as any,
+      );
+      vi.mocked(prisma.serverMember.findUnique).mockResolvedValue(makeMember() as any);
+      vi.mocked(prisma.memberRole.findMany).mockResolvedValue([] as any);
+      vi.mocked(prisma.role.findFirst).mockResolvedValue(
+        makeRole({ id: "world-role", permissions: 5n, isWorld: true }) as any,
+      );
+
+      const perms = await getEffectivePermissions("user-1", "server-1");
+      expect(perms).toBe(5n); // @world permissions only
     });
 
     it("should apply channel deny/allow rules", async () => {
@@ -79,6 +94,7 @@ describe("Permission System", () => {
       vi.mocked(prisma.memberRole.findMany).mockResolvedValue([
         { role: makeRole({ permissions: 3n }), roleId: "role-1" },
       ] as any);
+      vi.mocked(prisma.role.findFirst).mockResolvedValue(null); // no @world role
       // Channel rule denies permission 1n, allows permission 4n
       vi.mocked(prisma.channelRule.findMany).mockResolvedValue([
         { roleId: "role-1", allow: 4n, deny: 1n },
@@ -90,6 +106,26 @@ describe("Permission System", () => {
       expect(perms).toBe(6n);
     });
 
+    it("should apply @world channel rule to all members", async () => {
+      vi.mocked(prisma.server.findUnique).mockResolvedValue(
+        makeServer({ ownerId: "other" }) as any,
+      );
+      vi.mocked(prisma.serverMember.findUnique).mockResolvedValue(makeMember() as any);
+      vi.mocked(prisma.memberRole.findMany).mockResolvedValue([] as any);
+      vi.mocked(prisma.role.findFirst).mockResolvedValue(
+        makeRole({ id: "world-role", permissions: 7n, isWorld: true }) as any,
+      );
+      // @world channel rule denies permission 2n (POST_MESSAGES)
+      vi.mocked(prisma.channelRule.findMany).mockResolvedValue([
+        { roleId: "world-role", allow: 0n, deny: 2n },
+      ] as any);
+      vi.mocked(prisma.channelRule.findUnique).mockResolvedValue(null);
+
+      const perms = await getEffectivePermissions("user-1", "server-1", "channel-1");
+      // (7n & ~2n) | 0n = 5n
+      expect(perms).toBe(5n);
+    });
+
     it("should skip channel rules for ADMINISTRATOR", async () => {
       vi.mocked(prisma.server.findUnique).mockResolvedValue(
         makeServer({ ownerId: "other" }) as any,
@@ -98,6 +134,7 @@ describe("Permission System", () => {
       vi.mocked(prisma.memberRole.findMany).mockResolvedValue([
         { role: makeRole({ permissions: 8n }), roleId: "role-1" }, // ADMINISTRATOR
       ] as any);
+      vi.mocked(prisma.role.findFirst).mockResolvedValue(null); // no @world role
 
       const perms = await getEffectivePermissions("user-1", "server-1", "channel-1");
       // ADMINISTRATOR bypasses channel rules
@@ -146,6 +183,7 @@ describe("Permission System", () => {
       vi.mocked(prisma.memberRole.findMany).mockResolvedValue([
         { role: makeRole({ permissions: 1n }) },
       ] as any);
+      vi.mocked(prisma.role.findFirst).mockResolvedValue(null); // no @world role
 
       await expect(
         checkPermission("user-1", "server-1", 4n), // needs CONFIGURE_SERVER

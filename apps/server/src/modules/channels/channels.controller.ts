@@ -118,6 +118,7 @@ export class ChannelsController {
         req.userId,
         req.query.before?.toString(),
         limit,
+        req.query.around?.toString(),
       );
       res.json(messages);
     } catch (err) {
@@ -133,6 +134,37 @@ export class ChannelsController {
         req.userId,
       );
       res.json(readState);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async reorder(req: Request, res: Response, next: NextFunction) {
+    try {
+      await channelsService.reorder(
+        req.params.serverId.toString(),
+        req.body,
+        req.userId!,
+      );
+      res.status(204).send();
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async searchMessages(req: Request, res: Response, next: NextFunction) {
+    try {
+      const query = req.query.q as string;
+      const limit = req.query.limit
+        ? parseInt(req.query.limit.toString())
+        : undefined;
+      const messages = await channelsService.searchMessages(
+        req.params.id.toString(),
+        req.userId,
+        query,
+        limit,
+      );
+      res.json(messages);
     } catch (err) {
       next(err);
     }

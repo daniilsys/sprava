@@ -54,7 +54,10 @@ async function presign(
     ACL: "public-read",
   });
 
-  const uploadUrl = await getSignedUrl(s3, command, { expiresIn: PRESIGN_TTL });
+  const uploadUrl = await getSignedUrl(s3, command, {
+    expiresIn: PRESIGN_TTL,
+    unhoistableHeaders: new Set(["x-amz-acl"]),
+  });
   const fileUrl = `${CDN_BASE}/${key}`;
 
   return { uploadUrl, fileUrl, key };

@@ -3,6 +3,7 @@ node_modules/
 target/
 dist/
 .env
+docker-compose.override.yml
 .vscode/
 generated/
 CLAUDE.md

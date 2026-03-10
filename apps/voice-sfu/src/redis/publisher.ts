@@ -18,3 +18,8 @@ export async function publishNotification(
 ): Promise<void> {
   await pub.publish("voice:notify", JSON.stringify(notification));
 }
+
+/** Close the publisher connection (for graceful shutdown). */
+export async function closePublisher(): Promise<void> {
+  pub.disconnect();
+}

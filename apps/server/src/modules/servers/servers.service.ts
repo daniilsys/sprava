@@ -1,7 +1,12 @@
 import { prisma } from "../../config/db.js";
 import { AppError } from "../../utils/AppError.js";
 import { generateId } from "../../utils/snowflake.js";
-import { CreateServerDto, UpdateServerDto } from "./servers.schema.js";
+import { generateInviteCode } from "../../utils/inviteCode.js";
+import {
+  CreateServerDto,
+  UpdateServerDto,
+  PaginationQuery,
+} from "./servers.schema.js";
 import { getIO } from "../../websocket/index.js";
 import {
   toServerResponse,
@@ -13,7 +18,29 @@ import {
   checkPermission,
   checkRoleHierarchy,
 } from "../../utils/checkPermission.js";
-import { Permission, PermissionUtils } from "@sprava/shared";
+import { Permission, PermissionUtils, DEFAULT_WORLD_PERMISSIONS } from "@sprava/shared";
+import { redis } from "../../config/redis.js";
+import { invalidateReadyCache } from "../../websocket/socket.handlers.js";
+import { createAuditEntry } from "../audit/audit.service.js";
+
+/**
+ * Clean up Redis caches when a user leaves/is removed from a server:
+ * - Remove from presence:server:{serverId} SET
+ * - Invalidate ready cache (servers list is stale)
+ * - Remove presence subscriptions for members of that server
+ *   (this user no longer needs updates from them)
+ */
+async function cleanupServerCaches(serverId: string, userId: string): Promise<void> {
+  const pipeline = redis.pipeline();
+
+  // Remove from server presence SET
+  pipeline.srem(`presence:server:${serverId}`, userId);
+
+  // Invalidate ready cache so next connect doesn't include this server
+  await invalidateReadyCache(userId);
+
+  await pipeline.exec();
+}
 
 export class ServersService {
   private async requireServer(serverId: string) {
@@ -32,7 +59,17 @@ export class ServersService {
     return member;
   }
 
+  private async generateUniqueInviteCode(): Promise<string> {
+    for (let i = 0; i < 5; i++) {
+      const code = generateInviteCode();
+      const exists = await prisma.server.findUnique({ where: { inviteCode: code } });
+      if (!exists) return code;
+    }
+    throw new AppError("Failed to generate unique invite code", 500, "INVITE_CODE_GENERATION_FAILED");
+  }
+
   async create(dto: CreateServerDto, ownerId: string) {
+    const inviteCode = await this.generateUniqueInviteCode();
     return prisma.$transaction(async (tx) => {
       const server = await tx.server.create({
         data: {
@@ -41,11 +78,23 @@ export class ServersService {
           icon: dto.icon,
           description: dto.description,
           ownerId,
+          inviteCode,
         },
       });
 
       await tx.serverMember.create({
         data: { serverId: server.id, userId: ownerId },
+      });
+
+      await tx.role.create({
+        data: {
+          id: generateId(),
+          serverId: server.id,
+          name: "@world",
+          permissions: DEFAULT_WORLD_PERMISSIONS,
+          position: 0,
+          isWorld: true,
+        },
       });
 
       await tx.channel.createMany({
@@ -82,6 +131,25 @@ export class ServersService {
       where: { id: serverId },
       data: { name: dto.name, icon: dto.icon, description: dto.description },
     });
+
+    await createAuditEntry(serverId, userId, "SERVER_UPDATE", "Server", serverId, {
+      name: dto.name,
+      icon: dto.icon,
+      description: dto.description,
+    });
+
+    const io = getIO();
+    if (io) {
+      io.to(`server:${serverId}`).emit("server:updated", {
+        server: {
+          id: updated.id,
+          name: updated.name,
+          icon: updated.icon,
+          description: updated.description,
+        },
+      });
+    }
+
     return toServerResponse(updated);
   }
 
@@ -93,7 +161,27 @@ export class ServersService {
         403,
         "NOT_OWNER",
       );
+
+    // Fetch members before delete for cache cleanup
+    const members = await prisma.serverMember.findMany({
+      where: { serverId },
+      select: { userId: true },
+    });
+
+    // Emit BEFORE delete — rooms are emptied after delete
+    const io = getIO();
+    if (io) {
+      io.to(`server:${serverId}`).emit("server:deleted", { serverId });
+    }
+
     await prisma.server.delete({ where: { id: serverId } });
+
+    // Clean up Redis caches for all former members
+    const pipeline = redis.pipeline();
+    pipeline.del(`presence:server:${serverId}`);
+    await pipeline.exec();
+    // Invalidate ready cache for all members so the deleted server is gone
+    await Promise.all(members.map((m) => invalidateReadyCache(m.userId)));
   }
 
   async getById(
@@ -117,10 +205,42 @@ export class ServersService {
     return toServerResponse(server);
   }
 
-  async getMembers(serverId: string, userId: string) {
+  async getMembers(
+    serverId: string,
+    userId: string,
+    { cursor, limit: rawLimit = 50 }: Partial<PaginationQuery> = {},
+  ) {
+    const limit = Number(rawLimit);
     await this.requireMember(serverId, userId);
-    const members = await prisma.serverMember.findMany({ where: { serverId } });
-    return members.map(toMemberResponse);
+    const members = await prisma.serverMember.findMany({
+      where: {
+        serverId,
+        ...(cursor ? { joinedAt: { gt: new Date(cursor) } } : {}),
+      },
+      orderBy: { joinedAt: "asc" },
+      take: limit + 1,
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            avatar: true,
+            memberRoles: {
+              where: { role: { serverId } },
+              select: { roleId: true },
+            },
+          },
+        },
+      },
+    });
+    const hasMore = members.length > limit;
+    if (hasMore) members.pop();
+    return {
+      data: members.map(toMemberResponse),
+      cursor: hasMore
+        ? members[members.length - 1].joinedAt.toISOString()
+        : null,
+    };
   }
 
   async getMember(serverId: string, userId: string, memberId: string) {
@@ -169,21 +289,43 @@ export class ServersService {
       for (const { id } of channels) {
         io.in(`user:${userId}`).socketsJoin(`channel:${id}`);
       }
+
+      const newMember = await prisma.serverMember.findUnique({
+        where: { userId_serverId: { userId, serverId: server.id } },
+        include: {
+          user: { select: { id: true, username: true, avatar: true } },
+        },
+      });
       io.to(`server:${server.id}`).emit("server:member_join", {
         serverId: server.id,
         userId,
+        member: newMember ? toMemberResponse(newMember) : undefined,
       });
     }
 
-    return toServerResponse(server);
+    const full = await prisma.server.findUnique({
+      where: { id: server.id },
+      include: {
+        channels: { orderBy: { position: "asc" } },
+        roles: { orderBy: { position: "asc" } },
+      },
+    });
+    return full ? toServerResponse(full) : toServerResponse(server);
   }
 
   async kickMember(serverId: string, targetUserId: string, userId: string) {
     await checkPermission(userId, serverId, Permission.KICK);
     await checkRoleHierarchy(userId, targetUserId, serverId);
-    await prisma.serverMember.delete({
-      where: { userId_serverId: { userId: targetUserId, serverId } },
-    });
+    await prisma.$transaction([
+      prisma.memberRole.deleteMany({
+        where: { memberId: targetUserId, role: { serverId } },
+      }),
+      prisma.serverMember.delete({
+        where: { userId_serverId: { userId: targetUserId, serverId } },
+      }),
+    ]);
+
+    await createAuditEntry(serverId, userId, "MEMBER_KICK", "User", targetUserId);
 
     const io = getIO();
     if (io) {
@@ -200,6 +342,7 @@ export class ServersService {
         io.in(`user:${targetUserId}`).socketsLeave(`channel:${id}`);
       }
     }
+    await cleanupServerCaches(serverId, targetUserId);
   }
 
   async banMember(
@@ -212,12 +355,19 @@ export class ServersService {
     await checkRoleHierarchy(userId, targetUserId, serverId);
 
     await prisma.$transaction(async (tx) => {
+      await tx.memberRole.deleteMany({
+        where: { memberId: targetUserId, role: { serverId } },
+      });
       await tx.serverBan.create({
         data: { serverId, userId: targetUserId, reason },
       });
       await tx.serverMember.delete({
         where: { userId_serverId: { userId: targetUserId, serverId } },
       });
+    });
+
+    await createAuditEntry(serverId, userId, "MEMBER_BAN", "User", targetUserId, {
+      reason,
     });
 
     const io = getIO();
@@ -235,6 +385,7 @@ export class ServersService {
         io.in(`user:${targetUserId}`).socketsLeave(`channel:${id}`);
       }
     }
+    await cleanupServerCaches(serverId, targetUserId);
   }
 
   async unbanMember(serverId: string, targetUserId: string, userId: string) {
@@ -242,7 +393,10 @@ export class ServersService {
     await prisma.serverBan.delete({
       where: { userId_serverId: { userId: targetUserId, serverId } },
     });
+
+    await createAuditEntry(serverId, userId, "MEMBER_UNBAN", "User", targetUserId);
   }
+
   async leave(serverId: string, userId: string) {
     const server = await this.requireServer(serverId);
     if (server.ownerId === userId)
@@ -253,9 +407,14 @@ export class ServersService {
       );
 
     await this.requireMember(serverId, userId);
-    await prisma.serverMember.delete({
-      where: { userId_serverId: { userId, serverId } },
-    });
+    await prisma.$transaction([
+      prisma.memberRole.deleteMany({
+        where: { memberId: userId, role: { serverId } },
+      }),
+      prisma.serverMember.delete({
+        where: { userId_serverId: { userId, serverId } },
+      }),
+    ]);
 
     const io = getIO();
     if (io) {
@@ -272,12 +431,70 @@ export class ServersService {
         io.in(`user:${userId}`).socketsLeave(`channel:${id}`);
       }
     }
+    await cleanupServerCaches(serverId, userId);
   }
 
-  async getBans(serverId: string, userId: string) {
+  async getBans(
+    serverId: string,
+    userId: string,
+    { cursor, limit: rawLimit = 50 }: Partial<PaginationQuery> = {},
+  ) {
+    const limit = Number(rawLimit);
     await checkPermission(userId, serverId, Permission.BAN | Permission.UNBAN);
-    const bans = await prisma.serverBan.findMany({ where: { serverId } });
-    return bans.map(toServerBanResponse);
+    const bans = await prisma.serverBan.findMany({
+      where: {
+        serverId,
+        ...(cursor ? { bannedAt: { gt: new Date(cursor) } } : {}),
+      },
+      include: {
+        user: { select: { username: true, avatar: true } },
+      },
+      orderBy: { bannedAt: "asc" },
+      take: limit + 1,
+    });
+    const hasMore = bans.length > limit;
+    if (hasMore) bans.pop();
+    return {
+      data: bans.map(toServerBanResponse),
+      cursor: hasMore ? bans[bans.length - 1].bannedAt.toISOString() : null,
+    };
+  }
+
+  async preview(code: string) {
+    const server = await prisma.server.findUnique({
+      where: { inviteCode: code },
+      include: { _count: { select: { members: true } } },
+    });
+    if (!server)
+      throw new AppError("Server not found", 404, "SERVER_NOT_FOUND");
+    return {
+      name: server.name,
+      icon: server.icon,
+      description: server.description,
+      memberCount: server._count.members,
+    };
+  }
+
+  async regenerateInviteCode(serverId: string, userId: string) {
+    await this.requireServer(serverId);
+    await checkPermission(userId, serverId, Permission.GENERATE_INVITE);
+
+    const inviteCode = await this.generateUniqueInviteCode();
+    const updated = await prisma.server.update({
+      where: { id: serverId },
+      data: { inviteCode },
+    });
+
+    await createAuditEntry(serverId, userId, "INVITE_REGENERATE", "Server", serverId);
+
+    const io = getIO();
+    if (io) {
+      io.to(`server:${serverId}`).emit("server:updated", {
+        server: { id: updated.id, inviteCode: updated.inviteCode },
+      });
+    }
+
+    return toServerResponse(updated);
   }
 
   async transferOwnership(
@@ -305,6 +522,8 @@ export class ServersService {
       where: { id: serverId },
       data: { ownerId: newOwnerId },
     });
+
+    await createAuditEntry(serverId, userId, "OWNERSHIP_TRANSFER", "User", newOwnerId);
 
     const io = getIO();
     if (io) {

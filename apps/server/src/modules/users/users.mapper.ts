@@ -21,6 +21,7 @@ type SettingsInput = {
   showEmail: string;
   showWebsite: string;
   dmPrivacy: string;
+  noiseCancellation: string;
 };
 
 type UserFullInput = UserSummaryInput & {
@@ -62,6 +63,7 @@ export function toSettingsResponse(settings: SettingsInput) {
     showEmail: settings.showEmail,
     showWebsite: settings.showWebsite,
     dmPrivacy: settings.dmPrivacy,
+    noiseCancellation: settings.noiseCancellation,
   };
 }
 

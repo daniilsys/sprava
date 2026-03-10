@@ -2,6 +2,7 @@ import { prisma } from "../../config/db.js";
 import type { UpdateFriendshipDto } from "./friendships.schema.js";
 import { AppError } from "../../utils/AppError.js";
 import { generateId } from "../../utils/snowflake.js";
+import { getIO } from "../../websocket/index.js";
 
 export class FriendshipsService {
   async update(dto: UpdateFriendshipDto, userId: string) {
@@ -15,10 +16,16 @@ export class FriendshipsService {
       });
 
       if (relationship) {
-        await prisma.friendship.update({
+        const updated = await prisma.friendship.update({
           where: { id: relationship.id },
           data: { status: "BLOCKED" },
+          include: FriendshipsService.friendshipInclude,
         });
+
+        const io = getIO();
+        if (io) {
+          io.to(`user:${userId}`).emit("friendship:blocked", { friendship: this.toFriendshipResponse(updated) });
+        }
 
         return {
           receiverId: dto.receiverId,
@@ -26,14 +33,20 @@ export class FriendshipsService {
           createdAt: relationship.createdAt,
         };
       } else {
-        await prisma.friendship.create({
+        const created = await prisma.friendship.create({
           data: {
             id: generateId(),
             senderId: userId,
             receiverId: dto.receiverId,
             status: "BLOCKED",
           },
+          include: FriendshipsService.friendshipInclude,
         });
+
+        const io = getIO();
+        if (io) {
+          io.to(`user:${userId}`).emit("friendship:blocked", { friendship: this.toFriendshipResponse(created) });
+        }
 
         return {
           receiverId: dto.receiverId,
@@ -69,7 +82,17 @@ export class FriendshipsService {
     const updatedFriendship = await prisma.friendship.update({
       where: { id: friendship.id },
       data: { status: dto.status },
+      include: FriendshipsService.friendshipInclude,
     });
+
+    if (dto.status === "ACCEPTED") {
+      const io = getIO();
+      if (io) {
+        const payload = this.toFriendshipResponse(updatedFriendship);
+        io.to(`user:${updatedFriendship.senderId}`).emit("friendship:accepted", { friendship: payload });
+        io.to(`user:${updatedFriendship.receiverId}`).emit("friendship:accepted", { friendship: payload });
+      }
+    }
 
     return {
       receiverId: updatedFriendship.receiverId,
@@ -79,8 +102,8 @@ export class FriendshipsService {
   }
 
   async sendRequest(receiverUsername: string, userId: string) {
-    const receiver = await prisma.user.findUnique({
-      where: { username: receiverUsername },
+    const receiver = await prisma.user.findFirst({
+      where: { username: { equals: receiverUsername, mode: "insensitive" } },
     });
 
     if (!receiver) {
@@ -116,7 +139,15 @@ export class FriendshipsService {
         receiverId: receiver.id,
         status: "PENDING",
       },
+      include: FriendshipsService.friendshipInclude,
     });
+
+    const io = getIO();
+    if (io) {
+      const payload = this.toFriendshipResponse(newFriendship);
+      io.to(`user:${userId}`).emit("friendship:request_sent", { friendship: payload });
+      io.to(`user:${receiver.id}`).emit("friendship:request_received", { friendship: payload });
+    }
 
     return {
       receiverId: newFriendship.receiverId,
@@ -150,6 +181,11 @@ export class FriendshipsService {
 
     await prisma.friendship.delete({ where: { id: friendship.id } });
 
+    const io = getIO();
+    if (io) {
+      io.to(`user:${friendship.receiverId}`).emit("friendship:cancelled", { friendshipId: friendship.id });
+    }
+
     return { message: "Friendship request cancelled" };
   }
 
@@ -178,6 +214,11 @@ export class FriendshipsService {
 
     await prisma.friendship.delete({ where: { id: friendship.id } });
 
+    const io = getIO();
+    if (io) {
+      io.to(`user:${friendship.senderId}`).emit("friendship:rejected", { friendshipId: friendship.id });
+    }
+
     return { message: "Friendship request rejected" };
   }
 
@@ -197,6 +238,12 @@ export class FriendshipsService {
     }
 
     await prisma.friendship.delete({ where: { id: friendship.id } });
+
+    const io = getIO();
+    if (io) {
+      io.to(`user:${friendship.senderId}`).emit("friendship:removed", { friendshipId: friendship.id });
+      io.to(`user:${friendship.receiverId}`).emit("friendship:removed", { friendshipId: friendship.id });
+    }
 
     return { message: "Friendship removed" };
   }
@@ -230,7 +277,25 @@ export class FriendshipsService {
 
     await prisma.friendship.delete({ where: { id: friendship.id } });
 
+    const io = getIO();
+    if (io) {
+      io.to(`user:${userId}`).emit("friendship:unblocked", { friendshipId: friendship.id });
+    }
+
     return { message: "User unblocked" };
+  }
+
+  private static readonly userSelect = {
+    select: { id: true, username: true, avatar: true },
+  } as const;
+
+  private static readonly friendshipInclude = {
+    sender: { select: { id: true, username: true, avatar: true } },
+    receiver: { select: { id: true, username: true, avatar: true } },
+  } as const;
+
+  private toFriendshipResponse(f: { id: string; status: string; createdAt: Date; sender: { id: string; username: string; avatar: string | null }; receiver: { id: string; username: string; avatar: string | null } }) {
+    return { id: f.id, status: f.status, createdAt: f.createdAt, sender: f.sender, receiver: f.receiver };
   }
 
   async getFriends(userId: string) {
@@ -239,63 +304,76 @@ export class FriendshipsService {
         OR: [{ senderId: userId }, { receiverId: userId }],
         status: "ACCEPTED",
       },
+      include: {
+        sender: FriendshipsService.userSelect,
+        receiver: FriendshipsService.userSelect,
+      },
+      orderBy: { createdAt: "desc" },
     });
 
-    return friendships.map((friendship) => {
-      const friendId =
-        friendship.senderId === userId
-          ? friendship.receiverId
-          : friendship.senderId;
-      return {
-        friendId,
-        createdAt: friendship.createdAt,
-        status: friendship.status,
-      };
-    });
+    return friendships.map((f) => ({
+      id: f.id,
+      status: f.status,
+      createdAt: f.createdAt,
+      sender: f.sender,
+      receiver: f.receiver,
+    }));
   }
 
   async getBlockedUsers(userId: string) {
-    const blockedRelationships = await prisma.friendship.findMany({
-      where: {
-        senderId: userId,
-        status: "BLOCKED",
+    const blocked = await prisma.friendship.findMany({
+      where: { senderId: userId, status: "BLOCKED" },
+      include: {
+        sender: FriendshipsService.userSelect,
+        receiver: FriendshipsService.userSelect,
       },
+      orderBy: { createdAt: "desc" },
     });
 
-    return blockedRelationships.map((relationship) => ({
-      userId: relationship.receiverId,
-      createdAt: relationship.createdAt,
-      status: relationship.status,
+    return blocked.map((f) => ({
+      id: f.id,
+      status: f.status,
+      createdAt: f.createdAt,
+      sender: f.sender,
+      receiver: f.receiver,
     }));
   }
 
   async getFriendRequests(userId: string) {
-    const friendRequests = await prisma.friendship.findMany({
-      where: {
-        receiverId: userId,
-        status: "PENDING",
+    const requests = await prisma.friendship.findMany({
+      where: { receiverId: userId, status: "PENDING" },
+      include: {
+        sender: FriendshipsService.userSelect,
+        receiver: FriendshipsService.userSelect,
       },
+      orderBy: { createdAt: "desc" },
     });
 
-    return friendRequests.map((request) => ({
-      senderId: request.senderId,
-      createdAt: request.createdAt,
-      status: request.status,
+    return requests.map((f) => ({
+      id: f.id,
+      status: f.status,
+      createdAt: f.createdAt,
+      sender: f.sender,
+      receiver: f.receiver,
     }));
   }
 
   async getSentRequests(userId: string) {
-    const sentRequests = await prisma.friendship.findMany({
-      where: {
-        senderId: userId,
-        status: "PENDING",
+    const sent = await prisma.friendship.findMany({
+      where: { senderId: userId, status: "PENDING" },
+      include: {
+        sender: FriendshipsService.userSelect,
+        receiver: FriendshipsService.userSelect,
       },
+      orderBy: { createdAt: "desc" },
     });
 
-    return sentRequests.map((request) => ({
-      receiverId: request.receiverId,
-      createdAt: request.createdAt,
-      status: request.status,
+    return sent.map((f) => ({
+      id: f.id,
+      status: f.status,
+      createdAt: f.createdAt,
+      sender: f.sender,
+      receiver: f.receiver,
     }));
   }
 

@@ -39,11 +39,35 @@ describe("RolesService", () => {
   // ── Create ─────────────────────────────────────────────────────────────────
 
   describe("create", () => {
-    it("should create role with auto-incremented position", async () => {
+    it("should create role before @world and bump @world position", async () => {
+      const worldRole = makeRole({ id: "world-1", name: "@world", isWorld: true, position: 2 });
       const role = makeRole({ id: "r1", name: "Mod", position: 2 });
       vi.mocked(prisma.$transaction).mockImplementation(async (fn: any) => {
         const tx = {
           role: {
+            findFirst: vi.fn().mockResolvedValue(worldRole),
+            update: vi.fn().mockResolvedValue({ ...worldRole, position: 3 }),
+            create: vi.fn().mockResolvedValue(role),
+          },
+        };
+        return fn(tx);
+      });
+
+      const result = await service.create(
+        "server-1",
+        { name: "Mod", color: "#ff0000" },
+        "user-1",
+      );
+
+      expect(result.name).toBe("Mod");
+    });
+
+    it("should fall back to count when no @world role exists", async () => {
+      const role = makeRole({ id: "r1", name: "Mod", position: 2 });
+      vi.mocked(prisma.$transaction).mockImplementation(async (fn: any) => {
+        const tx = {
+          role: {
+            findFirst: vi.fn().mockResolvedValue(null),
             count: vi.fn().mockResolvedValue(2),
             create: vi.fn().mockResolvedValue(role),
           },
@@ -187,6 +211,96 @@ describe("RolesService", () => {
         "server-1",
         "role-1",
         { permissions: "255" },
+        "user-1",
+      );
+
+      expect(result).toBeTruthy();
+    });
+  });
+
+  // ── @world role protection ───────────────────────────────────────────────
+
+  describe("@world role protection", () => {
+    it("should not allow deleting the @world role", async () => {
+      vi.mocked(prisma.role.findFirst).mockResolvedValue(
+        makeRole({ isWorld: true }) as any,
+      );
+
+      await expect(
+        service.delete("server-1", "role-1", "user-1"),
+      ).rejects.toThrow("Cannot delete the @world role");
+    });
+
+    it("should not allow assigning the @world role", async () => {
+      vi.mocked(prisma.role.findFirst).mockResolvedValue(
+        makeRole({ isWorld: true }) as any,
+      );
+
+      await expect(
+        service.assignToMember("server-1", "role-1", "target", "actor"),
+      ).rejects.toThrow("Cannot assign the @world role");
+    });
+
+    it("should not allow unassigning the @world role", async () => {
+      vi.mocked(prisma.role.findFirst).mockResolvedValue(
+        makeRole({ isWorld: true }) as any,
+      );
+
+      await expect(
+        service.removeFromMember("server-1", "role-1", "target", "actor"),
+      ).rejects.toThrow("Cannot unassign the @world role");
+    });
+
+    it("should not allow moving @world role", async () => {
+      vi.mocked(prisma.role.findFirst).mockResolvedValue(
+        makeRole({ isWorld: true, position: 3 }) as any,
+      );
+
+      await expect(
+        service.update("server-1", "role-1", { position: 1 }, "user-1"),
+      ).rejects.toThrow("Cannot move the @world role");
+    });
+
+    it("should not allow renaming @world role", async () => {
+      vi.mocked(prisma.role.findFirst).mockResolvedValue(
+        makeRole({ isWorld: true, position: 3 }) as any,
+      );
+
+      await expect(
+        service.update("server-1", "role-1", { name: "everyone" }, "user-1"),
+      ).rejects.toThrow("Cannot rename the @world role");
+    });
+
+    it("should not allow changing @world role color", async () => {
+      vi.mocked(prisma.role.findFirst).mockResolvedValue(
+        makeRole({ isWorld: true, position: 3 }) as any,
+      );
+
+      await expect(
+        service.update("server-1", "role-1", { color: "#FF0000" }, "user-1"),
+      ).rejects.toThrow("Cannot change the @world role color");
+    });
+
+    it("should allow updating @world role permissions", async () => {
+      vi.mocked(prisma.role.findFirst).mockResolvedValue(
+        makeRole({ isWorld: true, position: 3 }) as any,
+      );
+      vi.mocked(prisma.$transaction).mockImplementation(async (fn: any) => {
+        const tx = {
+          role: {
+            updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+            update: vi.fn().mockResolvedValue(
+              makeRole({ isWorld: true, permissions: 100n }),
+            ),
+          },
+        };
+        return fn(tx);
+      });
+
+      const result = await service.update(
+        "server-1",
+        "role-1",
+        { permissions: "100" },
         "user-1",
       );
 

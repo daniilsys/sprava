@@ -3,7 +3,8 @@ import { handleLeave } from "../../src/handlers/leave.js";
 import { publishResponse, publishNotification } from "../../src/redis/publisher.js";
 import { destroyRoom } from "../../src/mediasoup/rooms.js";
 import {
-  userTransports,
+  transports,
+  userTransportIds,
   userProducers,
   userConsumers,
   userRooms,
@@ -33,7 +34,8 @@ const makeCmd = (overrides?: Partial<VoiceCommand>): VoiceCommand => ({
 
 describe("handleLeave", () => {
   beforeEach(() => {
-    userTransports.clear();
+    transports.clear();
+    userTransportIds.clear();
     userProducers.clear();
     userConsumers.clear();
     userRooms.clear();
@@ -65,14 +67,20 @@ describe("handleLeave", () => {
     expect(roomMap.has("prod-1")).toBe(false);
   });
 
-  it("closes the transport and removes from state", async () => {
-    const transport = { close: vi.fn() };
-    userTransports.set("user-1", transport as any);
+  it("closes all transports and removes from state", async () => {
+    const t1 = { close: vi.fn() };
+    const t2 = { close: vi.fn() };
+    transports.set("t1", t1 as any);
+    transports.set("t2", t2 as any);
+    userTransportIds.set("user-1", ["t1", "t2"]);
 
     await handleLeave(makeCmd());
 
-    expect(transport.close).toHaveBeenCalled();
-    expect(userTransports.has("user-1")).toBe(false);
+    expect(t1.close).toHaveBeenCalled();
+    expect(t2.close).toHaveBeenCalled();
+    expect(transports.has("t1")).toBe(false);
+    expect(transports.has("t2")).toBe(false);
+    expect(userTransportIds.has("user-1")).toBe(false);
   });
 
   it("removes user from userRooms", async () => {

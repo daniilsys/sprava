@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { handleConsume } from "../../src/handlers/consume.js";
 import { publishResponse } from "../../src/redis/publisher.js";
-import { userTransports, userConsumers, roomProducers } from "../../src/state.js";
-import { mockTransport, mockConsumer, mockRouter } from "../setup.js";
+import { transports, userTransportIds, userConsumers, roomProducers } from "../../src/state.js";
+import { mockRecvTransport, mockConsumer, mockRouter } from "../setup.js";
 import type { VoiceCommand } from "../../src/redis/subscriber.js";
 
 vi.mock("../../src/redis/publisher.js", () => ({
@@ -31,21 +31,28 @@ const makeCmd = (overrides?: Partial<VoiceCommand>): VoiceCommand => ({
   ...overrides,
 });
 
+function setupRecvTransport() {
+  transports.set(mockRecvTransport.id, mockRecvTransport as any);
+  userTransportIds.set("user-1", ["send-transport-1", mockRecvTransport.id]);
+}
+
 describe("handleConsume", () => {
   beforeEach(() => {
-    userTransports.clear();
+    transports.clear();
+    userTransportIds.clear();
     userConsumers.clear();
     roomProducers.clear();
   });
 
   it("creates a consumer and stores it per-user", async () => {
     vi.mocked(getRoom).mockReturnValue(mockRouter as any);
-    userTransports.set("user-1", mockTransport as any);
-    roomProducers.set("channel:ch1", new Map([["producer-1", { userId: "user-2", producer: {} as any }]]));
+    setupRecvTransport();
+    roomProducers.set("channel:ch1", new Map([["producer-1", { userId: "user-2", producer: { kind: "audio" } as any }]]));
 
     await handleConsume(makeCmd());
 
-    expect(mockTransport.consume).toHaveBeenCalledWith({
+    // Consumers start unpaused — AudioLevelObserver pauses after silence
+    expect(mockRecvTransport.consume).toHaveBeenCalledWith({
       producerId: "producer-1",
       rtpCapabilities: expect.any(Object),
       paused: false,
@@ -55,8 +62,8 @@ describe("handleConsume", () => {
 
   it("responds with consumer details", async () => {
     vi.mocked(getRoom).mockReturnValue(mockRouter as any);
-    userTransports.set("user-1", mockTransport as any);
-    roomProducers.set("channel:ch1", new Map([["producer-1", { userId: "user-2", producer: {} as any }]]));
+    setupRecvTransport();
+    roomProducers.set("channel:ch1", new Map([["producer-1", { userId: "user-2", producer: { kind: "audio" } as any }]]));
 
     await handleConsume(makeCmd());
 
@@ -84,7 +91,7 @@ describe("handleConsume", () => {
 
   it("responds with error if transport not found", async () => {
     vi.mocked(getRoom).mockReturnValue(mockRouter as any);
-    roomProducers.set("channel:ch1", new Map([["producer-1", { userId: "user-2", producer: {} as any }]]));
+    roomProducers.set("channel:ch1", new Map([["producer-1", { userId: "user-2", producer: { kind: "audio" } as any }]]));
 
     await handleConsume(makeCmd());
 
@@ -96,7 +103,7 @@ describe("handleConsume", () => {
 
   it("responds with error if producer not in room", async () => {
     vi.mocked(getRoom).mockReturnValue(mockRouter as any);
-    userTransports.set("user-1", mockTransport as any);
+    setupRecvTransport();
     roomProducers.set("channel:ch1", new Map());
 
     await handleConsume(makeCmd());
@@ -109,8 +116,8 @@ describe("handleConsume", () => {
 
   it("responds with error if canConsume returns false", async () => {
     vi.mocked(getRoom).mockReturnValue(mockRouter as any);
-    userTransports.set("user-1", mockTransport as any);
-    roomProducers.set("channel:ch1", new Map([["producer-1", { userId: "user-2", producer: {} as any }]]));
+    setupRecvTransport();
+    roomProducers.set("channel:ch1", new Map([["producer-1", { userId: "user-2", producer: { kind: "audio" } as any }]]));
     mockRouter.canConsume.mockReturnValueOnce(false);
 
     await handleConsume(makeCmd());

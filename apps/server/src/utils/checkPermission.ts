@@ -34,10 +34,16 @@ export async function getEffectivePermissions(
     include: { role: true },
   });
 
-  // Server-level permissions: union of all role permissions
+  // Fetch @world role — its permissions apply to ALL members implicitly
+  const worldRole = await prisma.role.findFirst({
+    where: { serverId, isWorld: true },
+  });
+  const worldPermissions = worldRole?.permissions ?? 0n;
+
+  // Server-level permissions: start with @world, then OR all assigned role permissions
   let permissions = memberRoles.reduce(
     (acc, mr) => acc | mr.role.permissions,
-    0n,
+    worldPermissions,
   );
 
   // ADMINISTRATOR bypasses channel rules
@@ -46,6 +52,7 @@ export async function getEffectivePermissions(
 
   // Apply role-based channel rules (one per role, lower priority)
   const roleIds = memberRoles.map((mr) => mr.roleId);
+  if (worldRole) roleIds.push(worldRole.id);
   const roleRules = await prisma.channelRule.findMany({
     where: { channelId, roleId: { in: roleIds } },
   });
