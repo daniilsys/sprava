@@ -60,7 +60,7 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-sprava}:${POSTGRES_PASSWORD:-change-me}@pgbouncer:6432/${POSTGRES_DB:-sprava}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-sprava}:${POSTGRES_PASSWORD:-change-me}@pgbouncer:5432/${POSTGRES_DB:-sprava}
       DATABASE_DIRECT_URL: postgresql://${POSTGRES_USER:-sprava}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${POSTGRES_DB:-sprava}
       REDIS_URL: redis://redis:6379
     depends_on:
