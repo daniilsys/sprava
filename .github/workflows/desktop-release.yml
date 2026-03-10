@@ -89,42 +89,96 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: Download latest.json from release
+      - name: Download all release assets
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          mkdir -p ./artifacts
           gh release download "${{ github.ref_name }}" \
             --repo "${{ github.repository }}" \
-            --pattern "latest.json" \
-            --dir ./artifacts
-
-      - name: Download all update bundles from release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # Download platform-specific update bundles (.tar.gz, .zip, .nsis.zip, .AppImage.tar.gz, .sig)
-          gh release download "${{ github.ref_name }}" \
-            --repo "${{ github.repository }}" \
-            --pattern "*.sig" \
-            --pattern "*.tar.gz" \
-            --pattern "*.zip" \
-            --pattern "*.AppImage*" \
-            --pattern "*.dmg" \
-            --pattern "*.deb" \
-            --pattern "*.msi" \
-            --pattern "*.exe" \
             --dir ./artifacts || true
+          echo "Downloaded assets:"
+          ls -la ./artifacts/
+
+      - name: Generate latest.json for updater
+        env:
+          TAG: ${{ github.ref_name }}
+          PUBLIC_REPO: ${{ vars.RELEASES_REPO }}
+        run: |
+          VERSION="${TAG#desktop-v}"
+          BASE_URL="https://github.com/${PUBLIC_REPO}/releases/download/${TAG}"
+          PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+          # Read signatures
+          read_sig() { [ -f "$1" ] && cat "$1" || echo ""; }
+
+          DARWIN_AARCH64_SIG=$(read_sig ./artifacts/Sprava.app.tar.gz.sig)
+          DARWIN_X86_SIG=$(read_sig ./artifacts/Sprava.app.tar.gz.sig)
+          LINUX_SIG=$(read_sig ./artifacts/Sprava_${VERSION}_amd64.AppImage.tar.gz.sig)
+          WINDOWS_SIG=$(read_sig ./artifacts/Sprava_${VERSION}_x64-setup.nsis.zip.sig)
+
+          # Find actual filenames (handle case variations)
+          find_asset() {
+            local pattern="$1"
+            ls ./artifacts/$pattern 2>/dev/null | head -1 | xargs -I{} basename {} || echo ""
+          }
+
+          # macOS signatures — tauri-action may produce per-target sig files
+          AARCH64_SIG_FILE=$(find_asset "*aarch64*tar.gz.sig")
+          X86_SIG_FILE=$(find_asset "*x64*tar.gz.sig")
+          AARCH64_TAR=$(find_asset "*aarch64*tar.gz" | head -1)
+          X86_TAR=$(find_asset "*x64*.app.tar.gz" | head -1)
+
+          # Re-read per-target sigs if they exist
+          [ -n "$AARCH64_SIG_FILE" ] && DARWIN_AARCH64_SIG=$(cat "./artifacts/$AARCH64_SIG_FILE")
+          [ -n "$X86_SIG_FILE" ] && DARWIN_X86_SIG=$(cat "./artifacts/$X86_SIG_FILE")
+
+          # Determine actual asset names
+          LINUX_TAR=$(find_asset "*AppImage.tar.gz")
+          WINDOWS_ZIP=$(find_asset "*nsis.zip")
+
+          # Fallback: if no nsis.zip, try msi.zip
+          [ -z "$WINDOWS_ZIP" ] && WINDOWS_ZIP=$(find_asset "*x64_en-US.msi.zip")
+          [ -z "$WINDOWS_SIG" ] && WINDOWS_SIG=$(read_sig ./artifacts/*msi.zip.sig)
+
+          cat > ./artifacts/latest.json << ENDJSON
+          {
+            "version": "${VERSION}",
+            "pub_date": "${PUB_DATE}",
+            "platforms": {
+              "darwin-aarch64": {
+                "signature": "${DARWIN_AARCH64_SIG}",
+                "url": "${BASE_URL}/${AARCH64_TAR:-Sprava.app.tar.gz}"
+              },
+              "darwin-x86_64": {
+                "signature": "${DARWIN_X86_SIG}",
+                "url": "${BASE_URL}/${X86_TAR:-Sprava.app.tar.gz}"
+              },
+              "linux-x86_64": {
+                "signature": "${LINUX_SIG}",
+                "url": "${BASE_URL}/${LINUX_TAR:-Sprava_${VERSION}_amd64.AppImage.tar.gz}"
+              },
+              "windows-x86_64": {
+                "signature": "${WINDOWS_SIG}",
+                "url": "${BASE_URL}/${WINDOWS_ZIP:-Sprava_${VERSION}_x64-setup.nsis.zip}"
+              }
+            }
+          }
+          ENDJSON
+
+          echo "Generated latest.json:"
+          cat ./artifacts/latest.json
 
       - name: Publish to public releases repo
         env:
           GH_TOKEN: ${{ secrets.RELEASES_REPO_TOKEN }}
         run: |
-          # Create or update the release on the public repo
           TAG="${{ github.ref_name }}"
           PUBLIC_REPO="${{ vars.RELEASES_REPO }}"
 
           # Delete existing release if any
           gh release delete "$TAG" --repo "$PUBLIC_REPO" --yes 2>/dev/null || true
+          gh api repos/$PUBLIC_REPO/git/refs/tags/$TAG -X DELETE 2>/dev/null || true
 
           # Create new release and upload all artifacts
           gh release create "$TAG" \
