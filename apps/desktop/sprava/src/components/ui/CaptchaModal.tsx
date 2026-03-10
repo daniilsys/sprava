@@ -88,8 +88,9 @@ export function CaptchaModal() {
         <div className="flex justify-center">
           <HCaptcha
             sitekey={
-              import.meta.env.VITE_HCAPTCHA_SITEKEY ||
-              "10000000-ffff-ffff-ffff-000000000001"
+              import.meta.env.DEV
+                ? "10000000-ffff-ffff-ffff-000000000001"
+                : "e8607c7c-6910-4202-b21c-b22e738ecfa2"
             }
             theme="dark"
             onVerify={(token) => close(token)}

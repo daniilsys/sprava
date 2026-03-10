@@ -1,7 +1,7 @@
 import { io, Socket } from "socket.io-client";
 import { api } from "./api";
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://localhost:3000";
+const SOCKET_URL = import.meta.env.DEV ? "http://localhost:3000" : "https://api.sprava.top";
 
 let socket: Socket | null = null;
 
