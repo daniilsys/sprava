@@ -62,7 +62,7 @@ jobs:
 
       - name: Install frontend dependencies
         working-directory: apps/desktop/sprava-v2
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --ignore-workspace
 
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
