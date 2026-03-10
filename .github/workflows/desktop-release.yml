@@ -11,9 +11,6 @@ permissions:
 env:
   TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
   TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-  SPRAVA_API_URL: ${{ vars.SPRAVA_API_URL }}
-  VITE_SOCKET_URL: ${{ vars.VITE_SOCKET_URL }}
-  VITE_HCAPTCHA_SITEKEY: ${{ vars.VITE_HCAPTCHA_SITEKEY }}
 
 jobs:
   build:
@@ -70,23 +67,10 @@ jobs:
         working-directory: apps/desktop/sprava
         run: pnpm install --frozen-lockfile --ignore-workspace
 
-      - name: Write .env.production for Vite
-        working-directory: apps/desktop/sprava
-        run: |
-          cat > .env.production << EOF
-          VITE_SOCKET_URL=${{ vars.VITE_SOCKET_URL }}
-          VITE_HCAPTCHA_SITEKEY=${{ vars.VITE_HCAPTCHA_SITEKEY }}
-          EOF
-          echo "Generated .env.production:"
-          cat .env.production
-
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SPRAVA_API_URL: ${{ vars.SPRAVA_API_URL }}
-          VITE_SOCKET_URL: ${{ vars.VITE_SOCKET_URL }}
-          VITE_HCAPTCHA_SITEKEY: ${{ vars.VITE_HCAPTCHA_SITEKEY }}
         with:
           projectPath: apps/desktop/sprava
           tauriScript: pnpm tauri
