@@ -7,60 +7,120 @@ const FROM = {
   name: "Sprava",
 };
 
+/* ── Brand tokens (keep in sync with desktop theme) ── */
+const BRAND = {
+  bg: "#0B0C10",
+  surface: "#12131A",
+  elevated: "#181924",
+  border: "#252738",
+  borderSubtle: "#1A1C2A",
+  primary: "#F08C50",
+  primaryHover: "#F59E68",
+  accent: "#9B6BF7",
+  textPrimary: "#F0EEF9",
+  textSecondary: "#9492AC",
+  textMuted: "#555370",
+};
+
+function emailShell(content: string): string {
+  return `<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sprava</title>
+</head>
+<body style="margin:0;padding:0;background:${BRAND.bg};font-family:-apple-system,'Segoe UI','Helvetica Neue',Arial,sans-serif;-webkit-font-smoothing:antialiased;">
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:${BRAND.bg};">
+    <tr>
+      <td align="center" style="padding:48px 16px;">
+
+        <!-- Logo -->
+        <table width="520" cellpadding="0" cellspacing="0" role="presentation">
+          <tr>
+            <td align="center" style="padding-bottom:32px;">
+              <span style="font-size:28px;font-weight:800;letter-spacing:-1px;color:${BRAND.primary};font-family:'Georgia',serif;">Sprava</span>
+            </td>
+          </tr>
+        </table>
+
+        <!-- Card -->
+        <table width="520" cellpadding="0" cellspacing="0" role="presentation" style="background:${BRAND.surface};border:1px solid ${BRAND.border};border-radius:16px;overflow:hidden;">
+          <!-- Gradient bar -->
+          <tr>
+            <td style="height:4px;background:linear-gradient(90deg,${BRAND.primary} 0%,${BRAND.accent} 100%);font-size:0;line-height:0;">&nbsp;</td>
+          </tr>
+          <tr>
+            <td style="padding:40px 36px 44px;">
+              ${content}
+            </td>
+          </tr>
+        </table>
+
+        <!-- Footer -->
+        <table width="520" cellpadding="0" cellspacing="0" role="presentation">
+          <tr>
+            <td align="center" style="padding:28px 0;">
+              <p style="margin:0;color:${BRAND.textMuted};font-size:12px;line-height:1.5;">
+                &copy; ${new Date().getFullYear()} Sprava &mdash; Tous droits r&eacute;serv&eacute;s
+              </p>
+            </td>
+          </tr>
+        </table>
+
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
+
 export async function sendVerificationEmail(
   to: string,
   token: string,
 ): Promise<void> {
   const url = `${process.env.APP_URL}/auth/verify-email?token=${token}`;
 
+  const content = `
+              <h2 style="margin:0 0 8px;color:${BRAND.textPrimary};font-size:22px;font-weight:700;letter-spacing:-0.3px;">
+                V&eacute;rifiez votre adresse email
+              </h2>
+              <p style="margin:0 0 28px;color:${BRAND.textSecondary};font-size:15px;line-height:1.7;">
+                Bienvenue sur Sprava ! Confirmez votre adresse email pour activer votre compte et commencer &agrave; discuter.
+              </p>
+
+              <!-- Button -->
+              <table cellpadding="0" cellspacing="0" role="presentation">
+                <tr>
+                  <td style="border-radius:10px;background:${BRAND.primary};">
+                    <a href="${url}" style="display:inline-block;padding:14px 32px;color:#08090C;font-size:15px;font-weight:700;text-decoration:none;letter-spacing:0.2px;">
+                      V&eacute;rifier mon email
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin:28px 0 0;color:${BRAND.textMuted};font-size:13px;line-height:1.6;">
+                Ce lien expire dans <span style="color:${BRAND.textSecondary};font-weight:600;">24 heures</span>.<br/>
+                Si vous n&rsquo;avez pas cr&eacute;&eacute; de compte, ignorez cet email.
+              </p>
+
+              <!-- Divider -->
+              <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:24px 0;">
+                <tr><td style="border-top:1px solid ${BRAND.borderSubtle};font-size:0;line-height:0;">&nbsp;</td></tr>
+              </table>
+
+              <p style="margin:0;color:${BRAND.textMuted};font-size:12px;line-height:1.5;">
+                Ou copiez ce lien&nbsp;:<br/>
+                <a href="${url}" style="color:${BRAND.primary};word-break:break-all;text-decoration:none;">${url}</a>
+              </p>`;
+
   await sgMail.send({
     to,
     from: FROM,
     subject: "Vérifiez votre adresse email — Sprava",
     text: `Cliquez sur ce lien pour vérifier votre compte : ${url}\n\nCe lien expire dans 24 heures.`,
-    html: `
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-</head>
-<body style="margin:0;padding:0;background:#0f0f0f;font-family:'Segoe UI',sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0">
-    <tr>
-      <td align="center" style="padding:48px 16px;">
-        <table width="480" cellpadding="0" cellspacing="0" style="background:#1a1a1a;border-radius:12px;overflow:hidden;">
-          <tr>
-            <td style="background:#5865f2;padding:32px;text-align:center;">
-              <h1 style="margin:0;color:#fff;font-size:24px;font-weight:700;letter-spacing:-0.5px;">Sprava</h1>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:40px 32px;">
-              <h2 style="margin:0 0 12px;color:#fff;font-size:20px;font-weight:600;">Vérifiez votre adresse email</h2>
-              <p style="margin:0 0 32px;color:#a0a0a0;font-size:15px;line-height:1.6;">
-                Merci de vous être inscrit sur Sprava. Cliquez sur le bouton ci-dessous pour confirmer votre adresse email et activer votre compte.
-              </p>
-              <a href="${url}" style="display:inline-block;background:#5865f2;color:#fff;text-decoration:none;font-size:15px;font-weight:600;padding:14px 28px;border-radius:8px;">
-                Vérifier mon email
-              </a>
-              <p style="margin:32px 0 0;color:#606060;font-size:13px;line-height:1.5;">
-                Ce lien expire dans <strong style="color:#a0a0a0;">24 heures</strong>.<br/>
-                Si vous n'avez pas créé de compte, ignorez cet email.
-              </p>
-              <hr style="margin:24px 0;border:none;border-top:1px solid #2a2a2a;" />
-              <p style="margin:0;color:#404040;font-size:12px;">
-                Ou copiez ce lien dans votre navigateur :<br/>
-                <span style="color:#5865f2;word-break:break-all;">${url}</span>
-              </p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`,
+    html: emailShell(content),
   });
 }
 
@@ -70,53 +130,45 @@ export async function sendPasswordResetEmail(
 ): Promise<void> {
   const url = `${process.env.APP_URL}/auth/reset-password?token=${token}`;
 
+  const content = `
+              <h2 style="margin:0 0 8px;color:${BRAND.textPrimary};font-size:22px;font-weight:700;letter-spacing:-0.3px;">
+                R&eacute;initialisation du mot de passe
+              </h2>
+              <p style="margin:0 0 28px;color:${BRAND.textSecondary};font-size:15px;line-height:1.7;">
+                Vous avez demand&eacute; &agrave; r&eacute;initialiser votre mot de passe. Cliquez sur le bouton ci-dessous pour en choisir un nouveau.
+              </p>
+
+              <!-- Button -->
+              <table cellpadding="0" cellspacing="0" role="presentation">
+                <tr>
+                  <td style="border-radius:10px;background:${BRAND.primary};">
+                    <a href="${url}" style="display:inline-block;padding:14px 32px;color:#08090C;font-size:15px;font-weight:700;text-decoration:none;letter-spacing:0.2px;">
+                      R&eacute;initialiser mon mot de passe
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin:28px 0 0;color:${BRAND.textMuted};font-size:13px;line-height:1.6;">
+                Ce lien expire dans <span style="color:${BRAND.textSecondary};font-weight:600;">1 heure</span>.<br/>
+                Si vous n&rsquo;avez pas fait cette demande, ignorez cet email &mdash; votre compte est en s&eacute;curit&eacute;.
+              </p>
+
+              <!-- Divider -->
+              <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:24px 0;">
+                <tr><td style="border-top:1px solid ${BRAND.borderSubtle};font-size:0;line-height:0;">&nbsp;</td></tr>
+              </table>
+
+              <p style="margin:0;color:${BRAND.textMuted};font-size:12px;line-height:1.5;">
+                Ou copiez ce lien&nbsp;:<br/>
+                <a href="${url}" style="color:${BRAND.primary};word-break:break-all;text-decoration:none;">${url}</a>
+              </p>`;
+
   await sgMail.send({
     to,
     from: FROM,
     subject: "Réinitialisez votre mot de passe — Sprava",
     text: `Cliquez sur ce lien pour réinitialiser votre mot de passe : ${url}\n\nCe lien expire dans 1 heure. Si vous n'avez pas fait cette demande, ignorez cet email.`,
-    html: `
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-</head>
-<body style="margin:0;padding:0;background:#0f0f0f;font-family:'Segoe UI',sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0">
-    <tr>
-      <td align="center" style="padding:48px 16px;">
-        <table width="480" cellpadding="0" cellspacing="0" style="background:#1a1a1a;border-radius:12px;overflow:hidden;">
-          <tr>
-            <td style="background:#5865f2;padding:32px;text-align:center;">
-              <h1 style="margin:0;color:#fff;font-size:24px;font-weight:700;letter-spacing:-0.5px;">Sprava</h1>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:40px 32px;">
-              <h2 style="margin:0 0 12px;color:#fff;font-size:20px;font-weight:600;">Réinitialisation du mot de passe</h2>
-              <p style="margin:0 0 32px;color:#a0a0a0;font-size:15px;line-height:1.6;">
-                Vous avez demandé à réinitialiser votre mot de passe. Cliquez sur le bouton ci-dessous pour en choisir un nouveau.
-              </p>
-              <a href="${url}" style="display:inline-block;background:#5865f2;color:#fff;text-decoration:none;font-size:15px;font-weight:600;padding:14px 28px;border-radius:8px;">
-                Réinitialiser mon mot de passe
-              </a>
-              <p style="margin:32px 0 0;color:#606060;font-size:13px;line-height:1.5;">
-                Ce lien expire dans <strong style="color:#a0a0a0;">1 heure</strong>.<br/>
-                Si vous n'avez pas fait cette demande, ignorez cet email — votre compte est en sécurité.
-              </p>
-              <hr style="margin:24px 0;border:none;border-top:1px solid #2a2a2a;" />
-              <p style="margin:0;color:#404040;font-size:12px;">
-                Ou copiez ce lien dans votre navigateur :<br/>
-                <span style="color:#5865f2;word-break:break-all;">${url}</span>
-              </p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`,
+    html: emailShell(content),
   });
 }
