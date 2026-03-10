@@ -30,7 +30,11 @@ describe("ServersService", () => {
 
       // $transaction passes mockPrisma as tx, so mock its models directly
       vi.mocked(prisma.server.create).mockResolvedValue(server as any);
-      vi.mocked(prisma.server.findUnique).mockResolvedValue(fullServer as any);
+      // First call: generateUniqueInviteCode checks if code exists (should return null)
+      // Second call: post-create lookup returns the full server
+      vi.mocked(prisma.server.findUnique)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValue(fullServer as any);
       vi.mocked(prisma.serverMember.create).mockResolvedValue({} as any);
       vi.mocked(prisma.role.create).mockResolvedValue({} as any);
       vi.mocked(prisma.channel.createMany).mockResolvedValue({ count: 2 } as any);

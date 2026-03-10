@@ -18,7 +18,7 @@ describe("FriendshipsService", () => {
 
   describe("sendRequest", () => {
     it("should create a PENDING friendship", async () => {
-      vi.mocked(prisma.user.findUnique).mockResolvedValue(
+      vi.mocked(prisma.user.findFirst).mockResolvedValue(
         makeUser({ id: "user-2", username: "target" }) as any,
       );
       vi.mocked(prisma.friendship.findFirst).mockResolvedValue(null);
@@ -33,7 +33,7 @@ describe("FriendshipsService", () => {
     });
 
     it("should throw USER_NOT_FOUND if receiver doesn't exist", async () => {
-      vi.mocked(prisma.user.findUnique).mockResolvedValue(null);
+      vi.mocked(prisma.user.findFirst).mockResolvedValue(null);
 
       await expect(service.sendRequest("nobody", "user-1")).rejects.toThrow(
         "Cannot find this user",
@@ -41,7 +41,7 @@ describe("FriendshipsService", () => {
     });
 
     it("should throw PENDING_FRIENDSHIP_EXISTS on duplicate pending", async () => {
-      vi.mocked(prisma.user.findUnique).mockResolvedValue(makeUser() as any);
+      vi.mocked(prisma.user.findFirst).mockResolvedValue(makeUser() as any);
       vi.mocked(prisma.friendship.findFirst).mockResolvedValue(
         makeFriendship({ status: "PENDING" }) as any,
       );
@@ -52,7 +52,7 @@ describe("FriendshipsService", () => {
     });
 
     it("should throw ALREADY_FRIENDS if already accepted", async () => {
-      vi.mocked(prisma.user.findUnique).mockResolvedValue(makeUser() as any);
+      vi.mocked(prisma.user.findFirst).mockResolvedValue(makeUser() as any);
       vi.mocked(prisma.friendship.findFirst).mockResolvedValue(
         makeFriendship({ status: "ACCEPTED" }) as any,
       );
@@ -63,7 +63,7 @@ describe("FriendshipsService", () => {
     });
 
     it("should throw USER_NOT_FOUND if target is blocked", async () => {
-      vi.mocked(prisma.user.findUnique).mockResolvedValue(makeUser() as any);
+      vi.mocked(prisma.user.findFirst).mockResolvedValue(makeUser() as any);
       vi.mocked(prisma.friendship.findFirst).mockResolvedValue(
         makeFriendship({ status: "BLOCKED" }) as any,
       );

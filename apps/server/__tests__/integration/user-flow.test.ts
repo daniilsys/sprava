@@ -146,7 +146,11 @@ describe("Integration: Server Flow", () => {
     const fullServer = { ...server, members: [], channels: [], roles: [] };
 
     vi.mocked(prisma.server.create).mockResolvedValue(server as any);
-    vi.mocked(prisma.server.findUnique).mockResolvedValue(fullServer as any);
+    // First call: generateUniqueInviteCode checks if code exists (should return null)
+    // Second call: post-create lookup returns the full server
+    vi.mocked(prisma.server.findUnique)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValue(fullServer as any);
     vi.mocked(prisma.serverMember.create).mockResolvedValue({} as any);
     vi.mocked(prisma.channel.createMany).mockResolvedValue({ count: 2 } as any);
 
@@ -267,7 +271,7 @@ describe("Integration: Friendship Flow", () => {
   const authHeader = { Authorization: "Bearer test-jwt-token" };
 
   it("POST /friendships/:receiverId — send request (200)", async () => {
-    vi.mocked(prisma.user.findUnique).mockResolvedValue(
+    vi.mocked(prisma.user.findFirst).mockResolvedValue(
       makeUser({ id: "user-2", username: "user-2" }) as any,
     );
     vi.mocked(prisma.friendship.findFirst).mockResolvedValue(null);

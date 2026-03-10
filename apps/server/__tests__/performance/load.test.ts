@@ -134,7 +134,7 @@ describe("Performance: Friendship Operations Under Load", () => {
     const service = new FriendshipsService();
 
     let callCount = 0;
-    vi.mocked(prisma.user.findUnique).mockImplementation(async () => {
+    vi.mocked(prisma.user.findFirst).mockImplementation(async () => {
       return makeUser({ id: `user-${++callCount}`, username: `user_${callCount}` }) as any;
     });
     vi.mocked(prisma.friendship.findFirst).mockResolvedValue(null);
