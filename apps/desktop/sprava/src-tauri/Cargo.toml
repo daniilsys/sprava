@@ -1,12 +1,12 @@
 [package]
-name = "sprava-v2-desktop"
+name = "sprava-desktop"
 version = "0.1.0"
 description = "Sprava Desktop Client"
 authors = ["you"]
 edition = "2021"
 
 [lib]
-name = "sprava_v2_desktop_lib"
+name = "sprava_desktop_lib"
 crate-type = ["lib", "cdylib", "staticlib"]
 
 [build-dependencies]

@@ -60,7 +60,7 @@ MEDIASOUP_ANNOUNCED_IP=<SERVER_PUBLIC_IP>
 ### 1. Clone and configure
 
 ```bash
-git clone <repo> && cd sprava-v2
+git clone <repo> && cd sprava
 cp .env.example .env
 # Edit .env with production values
 ```
@@ -130,7 +130,7 @@ docker compose up -d
 pnpm --filter server dev
 
 # Start desktop app
-cd apps/desktop/sprava-v2 && pnpm tauri dev
+cd apps/desktop/sprava && pnpm tauri dev
 ```
 
 ### Testing voice with two clients
@@ -138,7 +138,7 @@ cd apps/desktop/sprava-v2 && pnpm tauri dev
 ```bash
 # Terminal 1: first Tauri instance (started above)
 # Terminal 2: second Tauri instance sharing the same Vite dev server
-cd apps/desktop/sprava-v2 && cargo run --manifest-path src-tauri/Cargo.toml
+cd apps/desktop/sprava && cargo run --manifest-path src-tauri/Cargo.toml
 ```
 
 Log in with two different accounts, join the same voice channel.
