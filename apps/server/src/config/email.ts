@@ -35,11 +35,19 @@ function emailShell(content: string): string {
     <tr>
       <td align="center" style="padding:48px 16px;">
 
-        <!-- Logo -->
+        <!-- Logo + Mascot -->
         <table width="520" cellpadding="0" cellspacing="0" role="presentation">
           <tr>
-            <td align="center" style="padding-bottom:32px;">
-              <span style="font-size:28px;font-weight:800;letter-spacing:-1px;color:${BRAND.primary};font-family:'Georgia',serif;">Sprava</span>
+            <td align="center" style="padding-bottom:24px;">
+              <!--[if !mso]><!-->
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="24 24 208 208" width="56" height="56" style="display:block;margin:0 auto 12px;">
+                <rect x="36" y="36" width="184" height="184" rx="56" fill="#0A1020" stroke="#F28C4A" stroke-width="10"/>
+                <circle cx="98" cy="108" r="14" fill="#EDECF6"/>
+                <circle cx="158" cy="108" r="14" fill="#EDECF6"/>
+                <path d="M88 158 Q104 140 120 158 T152 158 T184 158" stroke="#2DD4BF" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+              </svg>
+              <!--<![endif]-->
+              <span style="font-size:26px;font-weight:800;letter-spacing:-1px;color:${BRAND.textPrimary};font-family:'Georgia',serif;">Spr<span style="color:${BRAND.primary};">a</span>va</span>
             </td>
           </tr>
         </table>
@@ -73,6 +81,42 @@ function emailShell(content: string): string {
   </table>
 </body>
 </html>`;
+}
+
+export function verifySuccessPage(): string {
+  const content = `
+              <div style="text-align:center;">
+                <div style="display:inline-block;width:56px;height:56px;border-radius:50%;background:${BRAND.primary}20;margin-bottom:20px;line-height:56px;font-size:28px;">
+                  &#10003;
+                </div>
+                <h2 style="margin:0 0 8px;color:${BRAND.textPrimary};font-size:22px;font-weight:700;letter-spacing:-0.3px;">
+                  Email v&eacute;rifi&eacute; !
+                </h2>
+                <p style="margin:0 0 12px;color:${BRAND.textSecondary};font-size:15px;line-height:1.7;">
+                  Votre adresse email a &eacute;t&eacute; confirm&eacute;e avec succ&egrave;s.<br/>
+                  Vous pouvez fermer cette page et retourner sur Sprava.
+                </p>
+                <a href="sprava://email/verified" style="display:inline-block;margin-top:16px;padding:12px 28px;background:${BRAND.primary};color:#08090C;font-size:15px;font-weight:700;text-decoration:none;border-radius:10px;letter-spacing:0.2px;">
+                  Ouvrir Sprava
+                </a>
+              </div>`;
+  return emailShell(content);
+}
+
+export function verifyErrorPage(message: string): string {
+  const content = `
+              <div style="text-align:center;">
+                <div style="display:inline-block;width:56px;height:56px;border-radius:50%;background:#E5484D20;margin-bottom:20px;line-height:56px;font-size:28px;color:#E5484D;">
+                  &#10007;
+                </div>
+                <h2 style="margin:0 0 8px;color:${BRAND.textPrimary};font-size:22px;font-weight:700;letter-spacing:-0.3px;">
+                  &Eacute;chec de la v&eacute;rification
+                </h2>
+                <p style="margin:0 0 28px;color:${BRAND.textSecondary};font-size:15px;line-height:1.7;">
+                  ${message}
+                </p>
+              </div>`;
+  return emailShell(content);
 }
 
 export async function sendVerificationEmail(

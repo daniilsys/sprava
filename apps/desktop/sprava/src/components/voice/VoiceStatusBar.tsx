@@ -2,11 +2,14 @@ import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useVoice } from "../../hooks/useVoice";
 import { useVoiceStore } from "../../store/voice.store";
+import { useAppStore } from "../../store/app.store";
+import { useAuthStore } from "../../store/auth.store";
+import { useUIStore } from "../../store/ui.store";
 import { VoiceControls } from "./VoiceControls";
 
 export function VoiceStatusBar() {
   const { t } = useTranslation("voice");
-  const { isConnected, currentRoomId, isScreenSharing, isCameraOn } = useVoice();
+  const { isConnected, currentRoomId, currentRoomType, currentContextId, isScreenSharing, isCameraOn } = useVoice();
 
   // Count all active streams in the room (self + peers)
   const peerScreenCount = useVoiceStore((s) => {
@@ -24,6 +27,28 @@ export function VoiceStatusBar() {
     return count;
   });
 
+  // Resolve display name for the current voice room
+  const roomName = useAppStore((s) => {
+    if (!currentContextId) return null;
+    if (currentRoomType === "channel") {
+      const channel = s.channels.get(currentContextId);
+      return channel?.name ?? null;
+    }
+    // DM conversation
+    const dm = s.dms.get(currentContextId);
+    if (!dm) return null;
+    if (dm.name) return dm.name;
+    const currentUserId = useAuthStore.getState().user?.id;
+    const other = dm.participants?.find((p) => p.userId !== currentUserId);
+    return other?.user?.username ?? null;
+  });
+
+  // Resolve serverId for channel navigation
+  const channelServerId = useAppStore((s) => {
+    if (currentRoomType !== "channel" || !currentContextId) return null;
+    return s.channels.get(currentContextId)?.serverId ?? null;
+  });
+
   const anyScreenActive = isScreenSharing || peerScreenCount > 0;
   const anyCameraActive = isCameraOn || peerCameraCount > 0;
   const [elapsed, setElapsed] = useState(0);
@@ -39,19 +64,26 @@ export function VoiceStatusBar() {
 
   if (!isConnected) return null;
 
-  const label = currentRoomId?.startsWith("channel:") ? t("status.voiceChannel") : t("status.voiceCall");
+  const label = roomName
+    ?? (currentRoomType === "channel" ? t("status.voiceChannel") : t("status.voiceCall"));
 
   const mm = String(Math.floor(elapsed / 60)).padStart(2, "0");
   const ss = String(elapsed % 60).padStart(2, "0");
 
+  const handleNavigate = () => {
+    if (!currentContextId) return;
+    if (currentRoomType === "channel" && channelServerId) {
+      useUIStore.getState().navigateToChannel(channelServerId, currentContextId);
+    } else if (currentRoomType === "dm") {
+      useUIStore.getState().navigateToDm(currentContextId);
+    }
+  };
+
   return (
     <div
-      className="fixed bottom-0 left-0 right-0 z-40 h-12 flex items-center justify-between pl-[88px] pr-4 animate-fade-slide-up"
+      className="fixed bottom-0 left-0 right-0 z-40 h-12 flex items-center justify-between pl-[88px] pr-4 animate-fade-slide-up bg-surface/95 backdrop-blur-xl border-t border-border-subtle"
       style={{
-        background: "linear-gradient(180deg, rgba(11,12,16,0.92) 0%, rgba(11,12,16,0.98) 100%)",
-        backdropFilter: "blur(12px) saturate(1.4)",
-        borderTop: "1px solid rgba(255,255,255,0.04)",
-        boxShadow: "0 -4px 24px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.02)",
+        boxShadow: "0 -4px 24px rgba(0,0,0,0.08)",
       }}
     >
       {/* Left: connection status */}
@@ -71,8 +103,11 @@ export function VoiceStatusBar() {
           />
         </div>
 
-        {/* Label + timer */}
-        <div className="flex items-center gap-2.5">
+        {/* Label + timer — clickable to navigate */}
+        <button
+          onClick={handleNavigate}
+          className="flex items-center gap-2.5 hover:opacity-80 transition-opacity cursor-pointer"
+        >
           <span className="text-[13px] font-semibold text-live tracking-tight">{label}</span>
           <span
             className="text-[11px] font-mono tabular-nums tracking-wider text-text-muted"
@@ -80,7 +115,7 @@ export function VoiceStatusBar() {
           >
             {mm}:{ss}
           </span>
-        </div>
+        </button>
 
         {/* Activity badges — screen / camera (shows for all participants) */}
         {(anyScreenActive || anyCameraActive) && (

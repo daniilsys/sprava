@@ -58,7 +58,11 @@ export function ChannelItem({ channel, serverId }: ChannelItemProps) {
   const voiceCount = useAppStore((s) => {
     if (channel.type !== "VOICE") return 0;
     const roomId = `channel:${channel.id}`;
-    return s.voiceStates.filter((vs) => vs.roomId === roomId).length;
+    let count = 0;
+    for (const vs of s.voiceStates.values()) {
+      if (vs.roomId === roomId) count++;
+    }
+    return count;
   });
 
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);

@@ -11,9 +11,14 @@
   "license": "ISC",
   "packageManager": "pnpm@10.30.3",
   "pnpm": {
-    "onlyBuiltDependencies": ["mediasoup"]
+    "onlyBuiltDependencies": [
+      "mediasoup"
+    ]
   },
   "devDependencies": {
     "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@tauri-apps/plugin-deep-link": "^2.4.7"
   }
 }

@@ -11,6 +11,7 @@ interface AuthState {
     email: string,
     password: string,
     captcha: string,
+    language: string,
   ): Promise<void>;
   logout(): Promise<void>;
   checkSession(): Promise<void>;
@@ -46,11 +47,12 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ user, status: "authenticated" });
   },
 
-  async register(username, email, password, captcha) {
+  async register(username, email, password, captcha, language) {
     const user = (await api.auth.register({
       username,
       email,
       password,
+      language,
       "h-captcha-response": captcha,
     })) as User;
     set({ user, status: "authenticated" });

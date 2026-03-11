@@ -21,7 +21,14 @@ import frVoice from "./locales/fr/voice.json";
 import frSettings from "./locales/fr/settings.json";
 import frErrors from "./locales/fr/errors.json";
 
-const savedLang = localStorage.getItem("appLanguage") || "en";
+function detectLanguage(): string {
+  const saved = localStorage.getItem("appLanguage");
+  if (saved) return saved;
+  const sys = navigator.language.split("-")[0];
+  return ["en", "fr"].includes(sys) ? sys : "en";
+}
+
+const savedLang = detectLanguage();
 
 i18next.use(initReactI18next).init({
   resources: {

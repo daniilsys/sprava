@@ -138,11 +138,11 @@ function CallPeer({
   const cameraProducerActive = useVoiceStore((s) => s.activeVideoProducers.has(`${userId}:camera`));
   const isWatchingScreen = useVoiceStore((s) => {
     const entry = s.videoStreams.get(`${userId}:screen`);
-    return entry ? entry.stream.getVideoTracks().length > 0 : false;
+    return entry?.stream ? entry.stream.getVideoTracks().length > 0 : false;
   });
   const isWatchingCamera = useVoiceStore((s) => {
     const entry = s.videoStreams.get(`${userId}:camera`);
-    return entry ? entry.stream.getVideoTracks().length > 0 : false;
+    return entry?.stream ? entry.stream.getVideoTracks().length > 0 : false;
   });
 
   const canWatchScreen = screenProducerActive && !isWatchingScreen;
@@ -387,11 +387,11 @@ export function DmHeader({ dm, currentUserId, contextId, onJumpToMessage }: DmHe
   if (isInThisCall) {
     const voiceStates = useAppStore.getState().voiceStates;
     const roomId = `dm:${contextId}`;
-    const peersInCall = voiceStates.filter((vs) => vs.roomId === roomId && vs.userId !== currentUserId);
+    const peersInCall = Array.from(voiceStates.values()).filter((vs) => vs.roomId === roomId && vs.userId !== currentUserId);
     const totalInCall = peersInCall.length + 1;
 
     const activeStreamEntries = Array.from(videoStreams.entries()).filter(
-      ([, entry]) => entry.stream.getVideoTracks().length > 0,
+      ([, entry]) => (entry.stream?.getVideoTracks().length ?? 0) > 0,
     );
     const hasStreams = activeStreamEntries.length > 0;
     const fsEntry = fullscreenKey ? activeStreamEntries.find(([key]) => key === fullscreenKey) : null;
@@ -532,7 +532,7 @@ export function DmHeader({ dm, currentUserId, contextId, onJumpToMessage }: DmHe
               </svg>
             </button>
             <div className="w-[95vw] h-[90vh] animate-lightbox-img-in" onClick={(e) => e.stopPropagation()}>
-              <FullscreenVideo stream={fsEntry[1].stream} />
+              <FullscreenVideo stream={fsEntry[1].stream!} />
             </div>
           </div>,
           document.body,

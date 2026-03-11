@@ -320,8 +320,18 @@ export function useSocket(
       );
 
       // DM created
-      socket.on("dm:created", ({ dm }) => {
+      socket.on("dm:created", ({ dm }: { dm: DmConversation }) => {
         useAppStore.getState().addDm(dm);
+        // Subscribe to presence for new DM participants
+        const currentUserId = useAuthStore.getState().user?.id;
+        if (dm.participants) {
+          const newUserIds = dm.participants
+            .filter((p) => p.userId !== currentUserId)
+            .map((p) => p.userId);
+          if (newUserIds.length > 0) {
+            socket.emit("presence:subscribe", { userIds: newUserIds });
+          }
+        }
       });
 
       // DM updates
@@ -398,7 +408,12 @@ export function useSocket(
       });
       socket.on("friendship:accepted", ({ friendship }: { friendship: Friendship }) => {
         const currentUserId = useAuthStore.getState().user?.id;
-        if (currentUserId) useFriendsStore.getState().updateFriendshipStatus(friendship, currentUserId);
+        if (currentUserId) {
+          useFriendsStore.getState().updateFriendshipStatus(friendship, currentUserId);
+          // Subscribe to the new friend's presence
+          const friendId = friendship.sender.id === currentUserId ? friendship.receiver.id : friendship.sender.id;
+          socket.emit("presence:subscribe", { userIds: [friendId] });
+        }
       });
       socket.on("friendship:cancelled", ({ friendshipId }: { friendshipId: string }) => {
         useFriendsStore.getState().removeFriendshipById(friendshipId);
@@ -425,8 +440,8 @@ export function useSocket(
       // Server members
       socket.on(
         "server:member_join",
-        ({ serverId, member }: { serverId: string; userId: string; member: Member }) => {
-          useAppStore.getState().addMember(serverId, member);
+        ({ serverId, member }: { serverId: string; userId: string; member?: Member }) => {
+          if (member?.user) useAppStore.getState().addMember(serverId, member);
         },
       );
       socket.on(

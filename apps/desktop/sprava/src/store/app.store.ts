@@ -23,7 +23,7 @@ interface AppState {
   friendships: Map<string, Friendship>;
   readStates: Map<string, string>; // channelId|dmId -> lastReadMessageId
   presence: Map<string, PresenceState>; // userId -> { status, statusMessage }
-  voiceStates: VoiceState[];
+  voiceStates: Map<string, VoiceState>;
 
   hydrateReady(payload: ReadyPayload): void;
   addServer(server: Server): void;
@@ -61,7 +61,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   friendships: new Map(),
   readStates: new Map(),
   presence: new Map(),
-  voiceStates: [],
+  voiceStates: new Map(),
 
   hydrateReady(payload) {
     const servers = new Map<string, Server>();
@@ -111,7 +111,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       friendships,
       readStates,
       presence,
-      voiceStates: payload.voiceStates,
+      voiceStates: new Map((payload.voiceStates || []).map((vs) => [vs.userId, vs])),
     });
 
     // Hydrate permissions
@@ -133,7 +133,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (server.channels) {
         for (const ch of server.channels) channels.set(ch.id, ch);
       }
-      return { servers, channels };
+      const roles = new Map(s.roles);
+      if (server.roles) {
+        for (const r of server.roles) roles.set(r.id, r);
+      }
+      return { servers, channels, roles };
     });
   },
 
@@ -176,13 +180,13 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
 
       // Clean up voiceStates for this server's channels
-      const voiceStates = s.voiceStates.filter((vs) => {
+      const voiceStates = new Map(s.voiceStates);
+      for (const [uid, vs] of voiceStates) {
         if (vs.roomId.startsWith("channel:")) {
           const channelId = vs.roomId.slice(8);
-          return !serverChannelIds.includes(channelId);
+          if (serverChannelIds.includes(channelId)) voiceStates.delete(uid);
         }
-        return true;
-      });
+      }
 
       return { servers, channels, members, roles, readStates, voiceStates };
     });
@@ -402,14 +406,18 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   addVoiceState(vs) {
-    set((s) => ({
-      voiceStates: [...s.voiceStates.filter((v) => v.userId !== vs.userId), vs],
-    }));
+    set((s) => {
+      const voiceStates = new Map(s.voiceStates);
+      voiceStates.set(vs.userId, vs);
+      return { voiceStates };
+    });
   },
 
   removeVoiceState(userId) {
-    set((s) => ({
-      voiceStates: s.voiceStates.filter((v) => v.userId !== userId),
-    }));
+    set((s) => {
+      const voiceStates = new Map(s.voiceStates);
+      voiceStates.delete(userId);
+      return { voiceStates };
+    });
   },
 }));

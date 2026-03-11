@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, memo } from "react";
 import { createPortal } from "react-dom";
 import { Avatar } from "../ui/Avatar";
 import { MessageItem } from "./MessageItem";
@@ -39,7 +39,7 @@ function formatTimestamp(iso: string): string {
   return `${date.toLocaleDateString()} ${time}`;
 }
 
-export function MessageGroup({ group, highlightId, onJumpToMessage }: MessageGroupProps) {
+export const MessageGroup = memo(function MessageGroup({ group, highlightId, onJumpToMessage }: MessageGroupProps) {
   const [profileOpen, setProfileOpen] = useState(false);
   const avatarRef = useRef<HTMLDivElement>(null);
   const closedAtRef = useRef(0);
@@ -95,4 +95,4 @@ export function MessageGroup({ group, highlightId, onJumpToMessage }: MessageGro
       </div>
     </div>
   );
-}
+});

@@ -96,59 +96,111 @@ export function PrivacySection() {
     return <p className="text-sm text-text-muted">{t("privacy.loadFailed")}</p>;
   }
 
+  const fieldIcons: Record<string, React.ReactNode> = {
+    showStatus: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10" />
+        <circle cx="12" cy="12" r="3" fill="var(--color-primary)" stroke="none" />
+      </svg>
+    ),
+    showActivity: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+      </svg>
+    ),
+    showLocation: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+        <circle cx="12" cy="10" r="3" />
+      </svg>
+    ),
+    showEmail: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="2" y="4" width="20" height="16" rx="2" />
+        <path d="M22 7l-10 6L2 7" />
+      </svg>
+    ),
+    showWebsite: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+      </svg>
+    ),
+    dmPrivacy: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+      </svg>
+    ),
+  };
+
   return (
-    <div className="max-w-xl space-y-1">
-      <p className="text-sm text-text-secondary mb-6">
+    <div className="max-w-2xl space-y-6">
+      <p className="text-sm text-text-secondary">
         {t("privacy.description")}
       </p>
 
-      {privacyFieldDefs.map((field) => (
-        <div key={field.key} className="py-4 border-b border-border-subtle last:border-0">
-          <div className="flex items-start justify-between gap-6">
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-text-primary">{t(field.labelKey)}</p>
-              <p className="text-xs text-text-muted mt-0.5">{t(field.descKey)}</p>
+      <div className="rounded-xl border border-border-subtle bg-elevated/50 overflow-hidden">
+        {privacyFieldDefs.map((field, i) => {
+          const label = (opt: string) =>
+            field.key === "dmPrivacy" ? t(`privacy.dm.${opt}`) : t(`privacy.level.${opt}`);
+          return (
+            <div key={field.key}>
+              {i > 0 && <div className="mx-5 border-t border-border-subtle" />}
+              <div className="px-5 py-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-primary/8 flex items-center justify-center flex-shrink-0">
+                    {fieldIcons[field.key]}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[11px] font-medium text-text-muted uppercase tracking-wider mb-0.5">
+                      {t(field.labelKey)}
+                    </p>
+                    <p className="text-xs text-text-muted/70">{t(field.descKey)}</p>
+                  </div>
+                  <div className="flex gap-1 flex-shrink-0">
+                    {field.options.map((opt) => (
+                      <button
+                        key={opt}
+                        onClick={() => setSettings({ ...settings, [field.key]: opt })}
+                        className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 cursor-pointer ${
+                          settings[field.key] === opt
+                            ? "bg-primary/15 text-primary border border-primary/25"
+                            : "bg-surface border border-border-subtle text-text-muted hover:text-text-secondary hover:border-border"
+                        }`}
+                      >
+                        {label(opt)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="flex gap-1 flex-shrink-0">
-              {field.options.map((opt) => {
-                const isActive = settings[field.key] === opt;
-                const label = field.key === "dmPrivacy"
-                  ? t(`privacy.dm.${opt}`)
-                  : t(`privacy.level.${opt}`);
-                return (
-                  <button
-                    key={opt}
-                    onClick={() => setSettings({ ...settings, [field.key]: opt })}
-                    className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all duration-150 ${
-                      isActive
-                        ? "bg-primary/15 text-primary border border-primary/30"
-                        : "bg-elevated border border-border text-text-muted hover:text-text-secondary hover:bg-elevated-2"
-                    }`}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+          );
+        })}
+      </div>
+
+      {error && (
+        <div className="flex items-center gap-2 text-xs text-danger bg-danger/8 rounded-lg px-3 py-2.5 border border-danger/10">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="15" y1="9" x2="9" y2="15" />
+            <line x1="9" y1="9" x2="15" y2="15" />
+          </svg>
+          {error}
         </div>
-      ))}
+      )}
 
-      {/* Error */}
-      {error && <p className="text-sm text-danger pt-2">{error}</p>}
-
-      {/* Save */}
-      <div className="flex items-center justify-end gap-3 pt-4">
+      <div className="flex items-center justify-end gap-3">
         {saved && (
-          <span className="text-sm text-live font-medium animate-in fade-in duration-150">
+          <span className="text-xs text-live font-medium">
             {t("privacy.saved")}
           </span>
         )}
         <Button
+          size="sm"
           onClick={handleSave}
           loading={saving}
           disabled={!hasChanges}
-          variant={saved ? "success" : "primary"}
         >
           {saved ? t("common:saved") : t("common:saveChanges")}
         </Button>

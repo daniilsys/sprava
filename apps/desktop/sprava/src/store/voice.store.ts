@@ -9,7 +9,7 @@ interface VoicePeer {
 
 export interface VideoStreamEntry {
   kind: "camera" | "screen";
-  stream: MediaStream;
+  stream: MediaStream | null;
 }
 
 interface VoiceState {
@@ -197,12 +197,8 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
     set((s) => {
       const videoStreams = new Map(s.videoStreams);
       const key = `${userId}:${kind}`;
-      if (stream) {
-        videoStreams.set(key, { kind, stream });
-      } else {
-        // Placeholder entry — stream will be set when the consumer is ready
-        videoStreams.set(key, { kind, stream: new MediaStream() });
-      }
+      // Placeholder entries use null — stream is set when the consumer is ready
+      videoStreams.set(key, { kind, stream: stream ?? null });
       return { videoStreams };
     });
   },
@@ -212,9 +208,7 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
       const videoStreams = new Map(s.videoStreams);
       const key = `${userId}:${kind}`;
       const entry = videoStreams.get(key);
-      if (entry?.stream) {
-        entry.stream.getTracks().forEach((t) => t.stop());
-      }
+      if (entry?.stream) entry.stream.getTracks().forEach((t) => t.stop());
       videoStreams.delete(key);
       return { videoStreams };
     });
@@ -242,7 +236,7 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
       localStream.getTracks().forEach((t) => t.stop());
     }
     for (const entry of videoStreams.values()) {
-      entry.stream.getTracks().forEach((t) => t.stop());
+      entry.stream?.getTracks().forEach((t) => t.stop());
     }
     get().clearPeers();
     set({

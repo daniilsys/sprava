@@ -69,5 +69,10 @@
   "update.available": "A new version ({{version}}) is available",
   "update.downloading": "Downloading update... {{progress}}%",
   "update.install": "Update now",
-  "update.restart": "Restart"
+  "update.restart": "Restart",
+  "welcome.title": "Welcome to Sprava",
+  "welcome.beta": "Beta",
+  "welcome.description": "This project is in early beta, built by Daniil. You may encounter bugs or rough edges — that's expected!",
+  "welcome.feedback": "Found a bug or have feedback? Open an issue on GitHub — every report helps make Sprava better.",
+  "welcome.cta": "Let's go!"
 }

@@ -30,11 +30,11 @@ export function VoicePeer({ userId, isSpeaking, isMuted, isDeafened, isSelf }: V
   const cameraProducerActive = useVoiceStore((s) => s.activeVideoProducers.has(`${userId}:camera`));
   const isWatchingScreen = useVoiceStore((s) => {
     const entry = s.videoStreams.get(`${userId}:screen`);
-    return entry ? entry.stream.getVideoTracks().length > 0 : false;
+    return entry?.stream ? entry.stream.getVideoTracks().length > 0 : false;
   });
   const isWatchingCamera = useVoiceStore((s) => {
     const entry = s.videoStreams.get(`${userId}:camera`);
-    return entry ? entry.stream.getVideoTracks().length > 0 : false;
+    return entry?.stream ? entry.stream.getVideoTracks().length > 0 : false;
   });
 
   const canWatchScreen = screenProducerActive && !isWatchingScreen;

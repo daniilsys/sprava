@@ -211,7 +211,7 @@ export function VideoGrid() {
   const [fullscreenKey, setFullscreenKey] = useState<string | null>(null);
 
   const entries = Array.from(videoStreams.entries()).filter(
-    ([, entry]) => entry.stream.getVideoTracks().length > 0,
+    ([, entry]) => (entry.stream?.getVideoTracks().length ?? 0) > 0,
   );
 
   const handleStopWatching = useCallback((userId: string, kind: "camera" | "screen") => {

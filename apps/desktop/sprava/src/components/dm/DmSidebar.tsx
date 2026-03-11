@@ -61,7 +61,7 @@ export function DmSidebar() {
           <line x1="21" y1="21" x2="16.65" y2="16.65" />
         </svg>
         <span className="text-xs text-text-muted group-hover:text-text-secondary transition-colors">{t("sidebar.search")}</span>
-        <kbd className="ml-auto text-[10px] text-text-muted bg-surface px-1 py-0.5 rounded border border-border-subtle font-mono">{t("sidebar.shortcut")}</kbd>
+        <kbd className="ml-auto text-[10px] text-text-muted bg-surface px-1 py-0.5 rounded border border-border-subtle font-mono">{navigator.platform.includes("Mac") ? "⌘K" : "Ctrl+K"}</kbd>
       </button>
       <ScrollArea className="flex-1 px-2 py-2">
         <div

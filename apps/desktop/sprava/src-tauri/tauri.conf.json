@@ -29,6 +29,11 @@
     "shell": {
       "open": true
     },
+    "deep-link": {
+      "desktop": {
+        "schemes": ["sprava"]
+      }
+    },
     "updater": {
       "endpoints": [
         "https://github.com/daniilsys/sprava-releases/releases/latest/download/latest.json"

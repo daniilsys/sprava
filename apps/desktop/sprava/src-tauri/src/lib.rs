@@ -16,6 +16,7 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_deep_link::init())
         .manage(AppState::new())
         .manage(NoiseSuppressionState::new())
         .invoke_handler(tauri::generate_handler![
@@ -25,6 +26,7 @@ pub fn run() {
             commands::auth::auth_logout,
             commands::auth::auth_verify_email,
             commands::auth::auth_resend_verification,
+            commands::auth::auth_change_email,
             commands::auth::auth_change_password,
             commands::auth::auth_forgot_password,
             commands::auth::auth_reset_password,

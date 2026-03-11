@@ -56,7 +56,12 @@ export class DmService {
         return g;
       });
 
-      const response = toDmResponse(group);
+      const fullGroup = await prisma.dmConversation.findUniqueOrThrow({
+        where: { id: group.id },
+        include: participantsInclude,
+      });
+
+      const response = toDmResponse(fullGroup);
 
       const io = getIO();
       if (io) {
@@ -136,7 +141,12 @@ export class DmService {
       return d;
     });
 
-    const response = toDmResponse(dm);
+    const fullDm = await prisma.dmConversation.findUniqueOrThrow({
+      where: { id: dm.id },
+      include: participantsInclude,
+    });
+
+    const response = toDmResponse(fullDm);
 
     const io = getIO();
     if (io) {

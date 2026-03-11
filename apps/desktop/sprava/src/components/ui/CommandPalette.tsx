@@ -35,11 +35,35 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
+
+  const [visible, setVisible] = useState(false);
+  const [closing, setClosing] = useState(false);
 
   const currentUserId = useAuthStore((s) => s.user?.id ?? "");
   const servers = useAppStore((s) => s.servers);
   const channels = useAppStore((s) => s.channels);
   const dms = useAppStore((s) => s.dms);
+
+  // Mount/unmount with animation (same pattern as SettingsModal)
+  useEffect(() => {
+    if (open) {
+      setVisible(true);
+      setClosing(false);
+    } else if (visible) {
+      setClosing(true);
+    }
+  }, [open, visible]);
+
+  // Wait for close animation to finish before unmounting
+  useEffect(() => {
+    if (!closing) return;
+    const el = overlayRef.current;
+    if (!el) { setVisible(false); setClosing(false); return; }
+    const handler = () => { setVisible(false); setClosing(false); };
+    el.addEventListener("animationend", handler, { once: true });
+    return () => el.removeEventListener("animationend", handler);
+  }, [closing]);
 
   // Build search index
   const allItems = useMemo((): ResultItem[] => {
@@ -147,15 +171,28 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
     [results, selectedIndex, navigate, onClose],
   );
 
-  if (!open) return null;
+  if (!visible) return null;
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh] bg-black/40 backdrop-blur-sm animate-backdrop"
+      ref={overlayRef}
+      className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh]"
+      style={{
+        animation: closing
+          ? "modal-overlay-out 180ms ease-in both"
+          : "modal-overlay-in 200ms ease-out both",
+        backgroundColor: "rgba(0,0,0,0.4)",
+        backdropFilter: "blur(4px)",
+      }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div
-        className="w-full max-w-lg bg-surface border border-border-subtle rounded-xl shadow-2xl overflow-hidden animate-command-palette-in"
+        className="w-full max-w-lg bg-surface border border-border-subtle rounded-xl shadow-2xl overflow-hidden"
+        style={{
+          animation: closing
+            ? "modal-content-out 180ms ease-in both"
+            : "modal-content-in 300ms var(--ease-spring) both",
+        }}
         onKeyDown={handleKeyDown}
       >
         {/* Search input */}

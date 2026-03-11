@@ -281,19 +281,10 @@ export function registerVoiceHandlers(io: Server, socket: Socket): void {
           const roomSize = await redis.scard(roomMembersKey(roomId));
           if (roomSize === 1) {
             // Broadcast to DM room but exclude ALL sockets of the caller
-            // (socket.to() only excludes the current socket, not other instances)
-            const callerSockets = await io.in(`user:${userId}`).fetchSockets();
-            const callerSocketIds = new Set(callerSockets.map((s) => s.id));
-
-            const dmSockets = await io.in(`dm:${dmConversationId}`).fetchSockets();
-            for (const s of dmSockets) {
-              if (!callerSocketIds.has(s.id)) {
-                s.emit("voice:dm_call_incoming", {
-                  dmConversationId,
-                  callerId: userId,
-                });
-              }
-            }
+            io.to(`dm:${dmConversationId}`).except(`user:${userId}`).emit("voice:dm_call_incoming", {
+              dmConversationId,
+              callerId: userId,
+            });
 
             // Start ring timeout — if nobody joins in 20s, disconnect the caller
             clearDmRingTimer(roomId);

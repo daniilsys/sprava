@@ -7,14 +7,25 @@ import { api } from "../../lib/api";
 import { translateError } from "../../lib/errorMapping";
 import { useAppStore } from "../../store/app.store";
 import { useUIStore } from "../../store/ui.store";
+import { usePermissionsStore } from "../../store/permissions.store";
+import { useDeepLinkStore } from "../../store/deeplink.store";
 import { requestCaptcha } from "../ui/CaptchaModal";
-import type { Server } from "../../types/models";
+import type { Server, ChannelRule } from "../../types/models";
 
 interface ServerPreview {
   name: string;
   icon: string | null;
   description: string | null;
   memberCount: number;
+}
+
+/** Extract the invite code from a raw input — handles full URLs, domain-prefixed, or bare codes */
+function extractCode(input: string): string {
+  const trimmed = input.trim();
+  // Match sprava.top/CODE with optional protocol
+  const match = trimmed.match(/^(?:https?:\/\/)?sprava\.top\/([A-Za-z0-9]+)$/);
+  if (match) return match[1];
+  return trimmed;
 }
 
 interface Props {
@@ -32,9 +43,20 @@ export function JoinServerModal({ open, onClose }: Props) {
   const [iconFailed, setIconFailed] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
+  // Pre-fill from deep link invite code
+  useEffect(() => {
+    if (!open) return;
+    const pending = useDeepLinkStore.getState().pendingInviteCode;
+    if (pending) {
+      setCode(pending);
+      useDeepLinkStore.getState().clearPendingInviteCode();
+    }
+  }, [open]);
+
   // Fetch preview when code changes
   useEffect(() => {
-    if (!code.trim() || code.trim().length < 3) {
+    const extracted = extractCode(code);
+    if (!extracted || extracted.length < 3) {
       setPreview(null);
       return;
     }
@@ -42,7 +64,7 @@ export function JoinServerModal({ open, onClose }: Props) {
     debounceRef.current = setTimeout(async () => {
       setPreviewLoading(true);
       try {
-        const result = (await api.servers.preview(code.trim())) as ServerPreview;
+        const result = (await api.servers.preview(extracted)) as ServerPreview;
         setPreview(result);
         setError("");
       } catch {
@@ -58,7 +80,8 @@ export function JoinServerModal({ open, onClose }: Props) {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!code.trim()) return;
+    const extracted = extractCode(code);
+    if (!extracted) return;
     setError("");
 
     const captchaToken = await requestCaptcha();
@@ -66,9 +89,15 @@ export function JoinServerModal({ open, onClose }: Props) {
 
     setLoading(true);
     try {
-      const server = (await api.servers.join(code.trim(), { "h-captcha-response": captchaToken })) as Server;
-      useAppStore.getState().addServer(server);
-      useUIStore.getState().navigateToServer(server.id);
+      const result = (await api.servers.join(extracted, { "h-captcha-response": captchaToken })) as Server & { channelRules?: ChannelRule[] };
+      useAppStore.getState().addServer(result);
+      if (result.channelRules?.length) {
+        const permStore = usePermissionsStore.getState();
+        for (const rule of result.channelRules) {
+          permStore.upsertChannelRule(rule);
+        }
+      }
+      useUIStore.getState().navigateToServer(result.id);
       setCode("");
       setPreview(null);
       onClose();

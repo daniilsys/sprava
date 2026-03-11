@@ -8,6 +8,8 @@ export const api = {
     logout: () => invoke("auth_logout"),
     verifyEmail: (token: string) => invoke("auth_verify_email", { token }),
     resendVerification: () => invoke("auth_resend_verification"),
+    changeEmail: (body: Record<string, unknown>) =>
+      invoke("auth_change_email", { body }),
     changePassword: (body: Record<string, unknown>) =>
       invoke("auth_change_password", { body }),
     forgotPassword: (body: Record<string, unknown>) =>

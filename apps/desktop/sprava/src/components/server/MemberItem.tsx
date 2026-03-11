@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, memo } from "react";
 import { useTranslation } from "react-i18next";
 import { createPortal } from "react-dom";
 import { Avatar } from "../ui/Avatar";
@@ -21,7 +21,7 @@ interface MemberItemProps {
   onBan?: () => void;
 }
 
-export function MemberItem({ userId, username, avatar, serverId, isOwner, roleColor, onKick, onBan }: MemberItemProps) {
+export const MemberItem = memo(function MemberItem({ userId, username, avatar, serverId, isOwner, roleColor, onKick, onBan }: MemberItemProps) {
   const { t } = useTranslation("server");
   const presenceState = useAppStore((s) => s.presence.get(userId));
   const status = presenceState?.status ?? "offline";
@@ -125,4 +125,4 @@ export function MemberItem({ userId, username, avatar, serverId, isOwner, roleCo
       )}
     </>
   );
-}
+});

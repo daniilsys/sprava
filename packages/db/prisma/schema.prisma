@@ -97,7 +97,7 @@ model UserSettings {
   showWebsite  PrivacyLevel @default(PUBLIC)
 
   dmPrivacy          DMPrivacyLevel    @default(COMMON_SERVER)
-  noiseCancellation  NoiseCancellation @default(HIGH_QUALITY)
+  noiseCancellation  NoiseCancellation @default(LIGHT)
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

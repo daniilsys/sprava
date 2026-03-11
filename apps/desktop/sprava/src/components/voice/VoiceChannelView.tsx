@@ -28,7 +28,7 @@ export function VoiceChannelView({ channel }: VoiceChannelViewProps) {
   const isInThisChannel = isConnected && currentContextId === channel.id;
   const roomId = `channel:${channel.id}`;
 
-  const othersInRoom = voiceStates.filter((vs) => vs.roomId === roomId && vs.userId !== currentUserId);
+  const othersInRoom = Array.from(voiceStates.values()).filter((vs) => vs.roomId === roomId && vs.userId !== currentUserId);
 
   // Fetch server members if voice peers are missing from the store
   const fetchingRef = useRef(false);

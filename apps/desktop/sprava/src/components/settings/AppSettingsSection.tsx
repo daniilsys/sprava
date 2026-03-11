@@ -131,77 +131,129 @@ export function AppSettingsSection() {
     return <p className="text-sm text-text-muted">{t("app.loadFailed")}</p>;
   }
 
+  const settingIcons: Record<string, React.ReactNode> = {
+    fontSize: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="4 7 4 4 20 4 20 7" />
+        <line x1="9" y1="20" x2="15" y2="20" />
+        <line x1="12" y1="4" x2="12" y2="20" />
+      </svg>
+    ),
+    theme: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="5" />
+        <line x1="12" y1="1" x2="12" y2="3" />
+        <line x1="12" y1="21" x2="12" y2="23" />
+        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+        <line x1="1" y1="12" x2="3" y2="12" />
+        <line x1="21" y1="12" x2="23" y2="12" />
+        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+      </svg>
+    ),
+    language: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10" />
+        <line x1="2" y1="12" x2="22" y2="12" />
+        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+      </svg>
+    ),
+    noiseCancellation: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+        <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+        <line x1="12" y1="19" x2="12" y2="23" />
+        <line x1="8" y1="23" x2="16" y2="23" />
+      </svg>
+    ),
+  };
+
+  const allRows = [
+    {
+      key: "fontSize" as const,
+      labelKey: "app.fontSize",
+      descKey: "app.fontSizeDesc",
+      options: (["small", "medium", "large"] as const).map((s) => ({
+        value: s,
+        label: t(`app.fontSize.${s}`),
+      })),
+      activeValue: fontSize,
+      onChange: (v: string) => useUIStore.getState().setFontSize(v as "small" | "medium" | "large"),
+    },
+    ...settingGroupDefs.map((g) => ({
+      key: g.key,
+      labelKey: g.labelKey,
+      descKey: g.descKey,
+      options: g.options.map((o) => ({
+        value: o.value,
+        label: o.staticLabel ?? t(o.labelKey!),
+      })),
+      activeValue: settings[g.key],
+      onChange: (v: string) => setSettings({ ...settings, [g.key]: v }),
+    })),
+  ];
+
   return (
-    <div className="max-w-xl space-y-1">
-      {/* Font size (client-only) */}
-      <div className="py-4 border-b border-border-subtle">
-        <div className="flex items-start justify-between gap-6">
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-text-primary">{t("app.fontSize")}</p>
-            <p className="text-xs text-text-muted mt-0.5">{t("app.fontSizeDesc")}</p>
+    <div className="max-w-2xl space-y-6">
+      <div className="rounded-xl border border-border-subtle bg-elevated/50 overflow-hidden">
+        {allRows.map((row, i) => (
+          <div key={row.key}>
+            {i > 0 && <div className="mx-5 border-t border-border-subtle" />}
+            <div className="px-5 py-4">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-primary/8 flex items-center justify-center flex-shrink-0">
+                  {settingIcons[row.key]}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[11px] font-medium text-text-muted uppercase tracking-wider mb-0.5">
+                    {t(row.labelKey)}
+                  </p>
+                  <p className="text-xs text-text-muted/70">{t(row.descKey)}</p>
+                </div>
+                <div className="flex gap-1 flex-shrink-0">
+                  {row.options.map((opt) => (
+                    <button
+                      key={opt.value}
+                      onClick={() => row.onChange(opt.value)}
+                      className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 cursor-pointer ${
+                        row.activeValue === opt.value
+                          ? "bg-primary/15 text-primary border border-primary/25"
+                          : "bg-surface border border-border-subtle text-text-muted hover:text-text-secondary hover:border-border"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
-          <div className="flex gap-1 flex-shrink-0">
-            {(["small", "medium", "large"] as const).map((size) => (
-              <button
-                key={size}
-                onClick={() => useUIStore.getState().setFontSize(size)}
-                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all duration-150 ${
-                  fontSize === size
-                    ? "bg-primary/15 text-primary border border-primary/30"
-                    : "bg-elevated border border-border text-text-muted hover:text-text-secondary hover:bg-elevated-2"
-                }`}
-              >
-                {t(`app.fontSize.${size}`)}
-              </button>
-            ))}
-          </div>
-        </div>
+        ))}
       </div>
 
-      {settingGroupDefs.map((group) => (
-        <div key={group.key} className="py-4 border-b border-border-subtle last:border-0">
-          <div className="flex items-start justify-between gap-6">
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-text-primary">{t(group.labelKey)}</p>
-              <p className="text-xs text-text-muted mt-0.5">{t(group.descKey)}</p>
-            </div>
-            <div className="flex gap-1 flex-shrink-0">
-              {group.options.map((opt) => {
-                const isActive = settings[group.key] === opt.value;
-                return (
-                  <button
-                    key={opt.value}
-                    onClick={() => setSettings({ ...settings, [group.key]: opt.value })}
-                    className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all duration-150 ${
-                      isActive
-                        ? "bg-primary/15 text-primary border border-primary/30"
-                        : "bg-elevated border border-border text-text-muted hover:text-text-secondary hover:bg-elevated-2"
-                    }`}
-                  >
-                    {opt.staticLabel ?? t(opt.labelKey!)}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+      {error && (
+        <div className="flex items-center gap-2 text-xs text-danger bg-danger/8 rounded-lg px-3 py-2.5 border border-danger/10">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="15" y1="9" x2="9" y2="15" />
+            <line x1="9" y1="9" x2="15" y2="15" />
+          </svg>
+          {error}
         </div>
-      ))}
+      )}
 
-      {/* Error */}
-      {error && <p className="text-sm text-danger pt-2">{error}</p>}
-
-      {/* Save */}
-      <div className="flex items-center justify-end gap-3 pt-4">
+      <div className="flex items-center justify-end gap-3">
         {saved && (
-          <span className="text-sm text-live font-medium animate-in fade-in duration-150">
+          <span className="text-xs text-live font-medium">
             {t("app.settingsSaved")}
           </span>
         )}
         <Button
+          size="sm"
           onClick={handleSave}
           loading={saving}
           disabled={!hasChanges}
-          variant={saved ? "success" : "primary"}
         >
           {saved ? t("common:saved") : t("common:saveChanges")}
         </Button>

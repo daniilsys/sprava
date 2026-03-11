@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback, useMemo, type KeyboardEvent } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { useTranslation } from "react-i18next";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useAppStore } from "../../store/app.store";
@@ -19,8 +20,18 @@ export function MemberList({ serverId }: MemberListProps) {
   const { t } = useTranslation(["server", "common"]);
   const memberMap = useAppStore((s) => s.members.get(serverId));
   const server = useAppStore((s) => s.servers.get(serverId));
-  const presence = useAppStore((s) => s.presence);
   const currentUserId = useAuthStore((s) => s.user?.id);
+
+  // Only re-render when a member of THIS server changes presence status
+  const memberIds = useMemo(() => memberMap ? Array.from(memberMap.keys()) : [], [memberMap]);
+  const presenceSelector = useCallback((s: { presence: Map<string, { status?: string }> }) => {
+    const result: Record<string, string> = {};
+    for (const id of memberIds) {
+      result[id] = s.presence.get(id)?.status ?? "offline";
+    }
+    return result;
+  }, [memberIds]);
+  const presenceStatuses = useAppStore(useShallow(presenceSelector));
   const isOwner = server?.ownerId === currentUserId;
   const hasKickPerm = usePermission(serverId, P.KICK);
   const hasBanPerm = usePermission(serverId, P.BAN);
@@ -95,10 +106,7 @@ export function MemberList({ serverId }: MemberListProps) {
     const ungroupedOffline: Member[] = [];
 
     for (const m of members) {
-      const isOnline = (() => {
-        const ps = presence.get(m.userId);
-        return ps && ps.status !== "offline";
-      })();
+      const isOnline = presenceStatuses[m.userId] !== "offline";
 
       // Find highest (lowest position) separate role this member has
       let bestRole: Role | null = null;
@@ -146,7 +154,7 @@ export function MemberList({ serverId }: MemberListProps) {
     }
 
     return result;
-  }, [members, rolesMap, serverId, presence]);
+  }, [members, rolesMap, serverId, presenceStatuses]);
 
   const virtualizer = useVirtualizer({
     count: items.length,

@@ -80,6 +80,16 @@ pub async fn auth_resend_verification(
         .await
 }
 
+/// PATCH /auth/change-email (authed)
+#[tauri::command]
+pub async fn auth_change_email(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    body: Value,
+) -> Result<Value, AppError> {
+    state.http.patch(&app, "/auth/change-email", &body).await
+}
+
 /// PATCH /auth/change-password (authed)
 #[tauri::command]
 pub async fn auth_change_password(

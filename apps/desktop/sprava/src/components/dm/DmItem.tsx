@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, memo } from "react";
 import { useTranslation } from "react-i18next";
 import { useUIStore } from "../../store/ui.store";
 import { useAppStore } from "../../store/app.store";
@@ -22,7 +22,7 @@ function getDmDisplayName(dm: DmConversation, currentUserId: string): string | n
   return other?.user?.username ?? null;
 }
 
-export function DmItem({ dm }: DmItemProps) {
+export const DmItem = memo(function DmItem({ dm }: DmItemProps) {
   const { t } = useTranslation("dm");
   const activeDmId = useUIStore((s) => s.activeDmId);
   const currentUserId = useAuthStore((s) => s.user?.id ?? "");
@@ -31,9 +31,12 @@ export function DmItem({ dm }: DmItemProps) {
   const hasUnread = dm.lastMessageId ? (!readState || dm.lastMessageId > readState) : false;
 
   // Check if there's an active voice call in this DM
-  const callActive = useAppStore((s) =>
-    s.voiceStates.some((vs) => vs.roomId === `dm:${dm.id}`),
-  );
+  const callActive = useAppStore((s) => {
+    for (const vs of s.voiceStates.values()) {
+      if (vs.roomId === `dm:${dm.id}`) return true;
+    }
+    return false;
+  });
 
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
 
@@ -96,4 +99,4 @@ export function DmItem({ dm }: DmItemProps) {
       )}
     </>
   );
-}
+});

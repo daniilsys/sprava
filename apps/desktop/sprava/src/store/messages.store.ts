@@ -46,6 +46,32 @@ interface MessagesState {
 }
 
 const LIMIT = 50;
+const MAX_CACHED_CONTEXTS = 5;
+
+/** LRU order tracker — most recently accessed contextId at front */
+const recentContexts: string[] = [];
+
+function touchContext(contextId: string) {
+  const idx = recentContexts.indexOf(contextId);
+  if (idx > 0) recentContexts.splice(idx, 1);
+  if (idx !== 0) recentContexts.unshift(contextId);
+}
+
+/** Evict least-recently-used contexts beyond the limit */
+function evictStaleContexts(state: {
+  messagesByContext: Map<string, Message[]>;
+  hasMore: Map<string, boolean>;
+  loading: Map<string, boolean>;
+  isJumped: Map<string, boolean>;
+}) {
+  while (recentContexts.length > MAX_CACHED_CONTEXTS) {
+    const evictId = recentContexts.pop()!;
+    state.messagesByContext.delete(evictId);
+    state.hasMore.delete(evictId);
+    state.loading.delete(evictId);
+    state.isJumped.delete(evictId);
+  }
+}
 
 export const useMessagesStore = create<MessagesState>((set, get) => ({
   messagesByContext: new Map(),
@@ -89,14 +115,18 @@ export const useMessagesStore = create<MessagesState>((set, get) => ({
         LIMIT,
       )) as Message[];
 
+      touchContext(contextId);
+
       set((s) => {
         const messagesByContext = new Map(s.messagesByContext);
         const hasMore = new Map(s.hasMore);
         const loading = new Map(s.loading);
+        const isJumped = new Map(s.isJumped);
         messagesByContext.set(contextId, messages);
         hasMore.set(contextId, messages.length === LIMIT);
         loading.set(contextId, false);
-        return { messagesByContext, hasMore, loading };
+        evictStaleContexts({ messagesByContext, hasMore, loading, isJumped });
+        return { messagesByContext, hasMore, loading, isJumped };
       });
 
       // Update cache in background
@@ -208,6 +238,7 @@ export const useMessagesStore = create<MessagesState>((set, get) => ({
   },
 
   addMessage(contextId, message) {
+    touchContext(contextId);
     set((s) => {
       const messagesByContext = new Map(s.messagesByContext);
       const current = messagesByContext.get(contextId) || [];

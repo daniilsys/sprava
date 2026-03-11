@@ -226,22 +226,14 @@ export async function registerSocketHandlers(
       await pipeline.exec();
 
       // Immediately send current presence for subscribed users
-      // Check which are online via presence:server:* sets
-      const onlineCheck = redis.pipeline();
-      for (const targetId of toAdd) {
-        // Check if user has any active socket
-        onlineCheck.exists(`user:status:${targetId}`);
-      }
-      const onlineResults = await onlineCheck.exec();
-
-      // Actually check if they have active sockets
+      // Check which are online via socket rooms (batched)
+      const socketChecks = await Promise.all(
+        toAdd.map((id) => io.in(`user:${id}`).fetchSockets()),
+      );
       const onlineIds: string[] = [];
       const offlineIds: string[] = [];
       for (let i = 0; i < toAdd.length; i++) {
-        // A status cache entry doesn't guarantee online (it has 5min TTL).
-        // Check via socket room instead.
-        const sockets = await io.in(`user:${toAdd[i]}`).fetchSockets();
-        if (sockets.length > 0) {
+        if (socketChecks[i].length > 0) {
           onlineIds.push(toAdd[i]);
         } else {
           offlineIds.push(toAdd[i]);

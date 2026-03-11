@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuthStore } from "./store/auth.store";
 import { listenAuthEvents } from "./lib/events";
+import { initDeepLinkListener } from "./lib/deeplink";
 import { Spinner } from "./components/ui/Spinner";
 import { AuthLayout } from "./components/auth/AuthLayout";
 import { LoginForm } from "./components/auth/LoginForm";
@@ -8,6 +9,8 @@ import { RegisterForm } from "./components/auth/RegisterForm";
 import { ForgotPasswordForm } from "./components/auth/ForgotPasswordForm";
 import { AppLayout } from "./components/layout/AppLayout";
 import { CaptchaModal } from "./components/ui/CaptchaModal";
+import { WelcomeModal } from "./components/ui/WelcomeModal";
+import { DeepLinkHandler } from "./components/DeepLinkHandler";
 
 type AuthView = "login" | "register" | "forgot";
 
@@ -17,6 +20,8 @@ function App() {
   const clearAuth = useAuthStore((s) => s.clearAuth);
   const [authView, setAuthView] = useState<AuthView>("login");
 
+  const deepLinkCleanup = useRef<(() => void) | null>(null);
+
   useEffect(() => {
     checkSession();
     const unlisten = listenAuthEvents({
@@ -24,6 +29,15 @@ function App() {
     });
     return unlisten;
   }, [checkSession, clearAuth]);
+
+  useEffect(() => {
+    initDeepLinkListener().then((cleanup) => {
+      deepLinkCleanup.current = cleanup;
+    });
+    return () => {
+      deepLinkCleanup.current?.();
+    };
+  }, []);
 
   if (status === "loading") {
     return (
@@ -58,7 +72,9 @@ function App() {
   return (
     <>
       <AppLayout />
+      <DeepLinkHandler />
       <CaptchaModal />
+      <WelcomeModal />
     </>
   );
 }

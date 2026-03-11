@@ -6,6 +6,7 @@ import {
   RegisterDto,
   LoginDto,
   ChangePasswordDto,
+  ChangeEmailDto,
   ForgotPasswordDto,
   ResetPasswordDto,
 } from "./auth.schema.js";
@@ -57,7 +58,7 @@ export class AuthService {
         },
       });
       await tx.userProfile.create({ data: { userId: newUser.id } });
-      await tx.userSettings.create({ data: { userId: newUser.id } });
+      await tx.userSettings.create({ data: { userId: newUser.id, language: dto.language } });
       return newUser;
     });
 
@@ -207,6 +208,43 @@ export class AuthService {
 
   async logout(token: string) {
     await prisma.refreshToken.deleteMany({ where: { token } });
+  }
+
+  async changeEmail(userId: string, dto: ChangeEmailDto): Promise<void> {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new AppError("User not found", 404, "NOT_FOUND");
+
+    const valid = await bcrypt.compare(dto.password, user.passwordHash);
+    if (!valid)
+      throw new AppError(
+        "Invalid password",
+        400,
+        "INVALID_CREDENTIALS",
+      );
+
+    if (dto.newEmail === user.email)
+      throw new AppError(
+        "New email must be different from current email",
+        400,
+        "SAME_EMAIL",
+      );
+
+    const existing = await prisma.user.findUnique({ where: { email: dto.newEmail } });
+    if (existing)
+      throw new AppError(
+        "This email is already in use",
+        400,
+        "ALREADY_EXISTS",
+      );
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { email: dto.newEmail, verified: false },
+    });
+
+    this.sendVerification(userId, dto.newEmail).catch((e) => {
+      logger.error({ err: e, userId }, "Failed to send verification email after email change");
+    });
   }
 
   async changePassword(userId: string, dto: ChangePasswordDto): Promise<void> {

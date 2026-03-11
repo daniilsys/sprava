@@ -19,7 +19,6 @@ import { api } from "./api";
 import { invoke } from "@tauri-apps/api/core";
 import {
   getStoredAudioInputDeviceId,
-  getStoredAudioOutputDeviceId,
 } from "../components/voice/AudioDeviceSelector";
 
 let device: Device | null = null;
@@ -29,6 +28,19 @@ let producer: types.Producer | null = null;
 let noiseGate: NoiseGateResult | null = null;
 let noiseSuppression: NoiseSuppressionResult | null = null;
 const consumers = new Map<string, types.Consumer>();
+
+/** Shared AudioContext for all remote audio playback (one instead of N per consumer) */
+let playbackCtx: AudioContext | null = null;
+
+export function getPlaybackCtx(): AudioContext {
+  if (!playbackCtx || playbackCtx.state === "closed") {
+    playbackCtx = new AudioContext();
+  }
+  if (playbackCtx.state === "suspended") {
+    playbackCtx.resume().catch(() => {});
+  }
+  return playbackCtx;
+}
 /** Maps video stream key (`${userId}:${kind}`) → consumerId so we can stop watching */
 const videoConsumerKeys = new Map<string, string>();
 
@@ -345,43 +357,27 @@ export async function consumeProducer(producerId: string, userId: string) {
       const cameraKey = `${userId}:camera`;
       const screenKey = `${userId}:screen`;
       // Check which video kind was announced via voice:video_start
-      const kind = store.videoStreams.has(screenKey) && !store.videoStreams.get(screenKey)?.stream.getVideoTracks().length
+      const kind = store.videoStreams.has(screenKey) && !store.videoStreams.get(screenKey)?.stream?.getVideoTracks().length
         ? "screen"
-        : store.videoStreams.has(cameraKey) && !store.videoStreams.get(cameraKey)?.stream.getVideoTracks().length
+        : store.videoStreams.has(cameraKey) && !store.videoStreams.get(cameraKey)?.stream?.getVideoTracks().length
           ? "camera"
           : "camera"; // default fallback
       store.addVideoStream(userId, kind, stream);
       videoConsumerKeys.set(`${userId}:${kind}`, response.consumerId);
       store.setActiveVideoProducer(userId, kind, producerId);
     } else {
-      // Audio consumer — play via Web Audio API + DOM element
+      // Audio consumer — play via shared Web Audio API context
       useVoiceStore.getState().updatePeer(userId, {
         consumerId: response.consumerId,
         producerId,
         stream,
       });
 
-      // Play remote audio via Web Audio API (HTMLAudioElement doesn't work in WKWebView for WebRTC)
-      const audioCtx = new AudioContext();
-      const source = audioCtx.createMediaStreamSource(stream);
-      source.connect(audioCtx.destination);
-      // Store context for cleanup
-      (consumer as any)._audioCtx = audioCtx;
-
-      // Also attach a DOM audio element as fallback
-      const audio = document.createElement("audio");
-      audio.srcObject = stream;
-      audio.autoplay = true;
-      audio.setAttribute("data-voice-consumer", response.consumerId);
-      document.body.appendChild(audio);
-
-      // Apply stored output device if available
-      const storedOutputDevice = getStoredAudioOutputDeviceId();
-      if (storedOutputDevice && typeof (audio as any).setSinkId === "function") {
-        (audio as any).setSinkId(storedOutputDevice).catch(() => {});
-      }
-
-      audio.play().catch(() => {});
+      const ctx = getPlaybackCtx();
+      const source = ctx.createMediaStreamSource(stream);
+      source.connect(ctx.destination);
+      // Store source node for cleanup (disconnect only, don't close shared ctx)
+      (consumer as any)._audioSource = source;
 
       // Monitor remote audio level for speaking indicator
       startAudioMonitor(userId, stream);
@@ -404,19 +400,19 @@ function cleanup() {
   producer = null;
 
   for (const consumer of consumers.values()) {
-    // Close audio context used for playback
-    const ctx = (consumer as any)._audioCtx as AudioContext | undefined;
-    if (ctx) ctx.close().catch(() => {});
+    // Disconnect audio source from shared playback context
+    const source = (consumer as any)._audioSource as MediaStreamAudioSourceNode | undefined;
+    if (source) source.disconnect();
     consumer.close();
   }
   consumers.clear();
   videoConsumerKeys.clear();
 
-  // Remove all audio elements from the DOM
-  document.querySelectorAll("audio[data-voice-consumer]").forEach((el) => {
-    (el as HTMLAudioElement).srcObject = null;
-    el.remove();
-  });
+  // Close shared playback AudioContext
+  if (playbackCtx) {
+    playbackCtx.close().catch(() => {});
+    playbackCtx = null;
+  }
 
   sendTransport?.close();
   sendTransport = null;
@@ -441,17 +437,6 @@ export function handleVoiceUserJoined(userId: string) {
 
 export function handleVoiceUserLeft(userId: string) {
   stopAudioMonitor(userId);
-  // Remove the audio element for this peer's consumer
-  const peer = useVoiceStore.getState().peers.get(userId);
-  if (peer?.consumerId) {
-    const el = document.querySelector(
-      `audio[data-voice-consumer="${peer.consumerId}"]`,
-    );
-    if (el) {
-      (el as HTMLAudioElement).srcObject = null;
-      el.remove();
-    }
-  }
   useVoiceStore.getState().removePeer(userId);
   if (useVoiceStore.getState().currentRoomId) {
     playLeaveSound();

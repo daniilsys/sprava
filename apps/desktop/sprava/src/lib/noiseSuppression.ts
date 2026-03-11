@@ -315,6 +315,7 @@ async function createIpcSuppression(
   // Strictly sequential processing (DeepFilterNet is stateful)
   let processing = false;
   const queue: number[][] = [];
+  const MAX_QUEUE_SIZE = 20; // ~200ms of audio at 10ms hop size
 
   async function processFrame(samples: number[]) {
     try {
@@ -339,6 +340,7 @@ async function createIpcSuppression(
 
   workletNode.port.onmessage = (e: MessageEvent) => {
     if (e.data.type === "frame") {
+      if (queue.length >= MAX_QUEUE_SIZE) queue.shift();
       queue.push(e.data.samples);
       drain();
     }

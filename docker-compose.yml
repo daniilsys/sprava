@@ -37,7 +37,7 @@ services:
     image: redis:7-alpine
     restart: unless-stopped
     ports:
-      - "127.0.0.1:6379:6379"
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
     command: >
       redis-server
       --maxmemory 550mb
@@ -88,7 +88,7 @@ services:
     env_file:
       - .env
     environment:
-      REDIS_URL: redis://127.0.0.1:6379
+      REDIS_URL: redis://host.docker.internal:${REDIS_PORT:-6379}
       MEDIASOUP_LISTEN_IP: "0.0.0.0"
       MEDIASOUP_ANNOUNCED_IP: "${MEDIASOUP_ANNOUNCED_IP}"
       RTC_MIN_PORT: "${RTC_MIN_PORT:-10000}"

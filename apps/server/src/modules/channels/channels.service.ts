@@ -317,20 +317,22 @@ export class ChannelsService {
       const children = await prisma.channel.findMany({
         where: { parentId: channelId, syncParentRules: true },
       });
-      for (const child of children) {
-        if (dto.roleId) {
-          await prisma.channelRule.upsert({
-            where: { channelId_roleId: { channelId: child.id, roleId: dto.roleId } },
-            create: { id: generateId(), channelId: child.id, roleId: dto.roleId, ...data },
-            update: data,
-          });
-        } else {
-          await prisma.channelRule.upsert({
-            where: { channelId_memberId: { channelId: child.id, memberId: dto.memberId! } },
-            create: { id: generateId(), channelId: child.id, memberId: dto.memberId, ...data },
-            update: data,
-          });
-        }
+      if (children.length > 0) {
+        await prisma.$transaction(
+          children.map((child) =>
+            dto.roleId
+              ? prisma.channelRule.upsert({
+                  where: { channelId_roleId: { channelId: child.id, roleId: dto.roleId! } },
+                  create: { id: generateId(), channelId: child.id, roleId: dto.roleId, ...data },
+                  update: data,
+                })
+              : prisma.channelRule.upsert({
+                  where: { channelId_memberId: { channelId: child.id, memberId: dto.memberId! } },
+                  create: { id: generateId(), channelId: child.id, memberId: dto.memberId, ...data },
+                  update: data,
+                }),
+          ),
+        );
       }
     }
 

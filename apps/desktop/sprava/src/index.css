@@ -285,6 +285,61 @@ textarea:focus-visible {
   animation: backdrop-fade 200ms ease-out both;
 }
 
+/* ─── Auth screen ─── */
+@keyframes auth-orb-drift {
+  from { transform: translate(0, 0) scale(1); }
+  to { transform: translate(30px, -20px) scale(1.08); }
+}
+
+@keyframes auth-stagger-up {
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(0.97);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes auth-mascot-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+@keyframes auth-shimmer {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+@keyframes auth-blink {
+  0%, 92%, 100% { transform: scaleY(1); }
+  95% { transform: scaleY(0.1); }
+}
+
+.auth-stagger-in > .auth-stagger-item {
+  opacity: 0;
+  animation: auth-stagger-up 700ms var(--ease-out) both;
+  animation-delay: calc(var(--stagger, 0) * 120ms + 100ms);
+}
+
+.auth-mascot-bounce {
+  animation: auth-mascot-bounce 3s ease-in-out infinite;
+  animation-delay: 1.5s;
+}
+
+.auth-mascot-eye-left,
+.auth-mascot-eye-right {
+  transform-origin: center;
+  animation: auth-blink 4s ease-in-out infinite;
+}
+
+.auth-mascot-eye-right {
+  animation-delay: 0.1s;
+}
+
 /* ─── Voice call panel ─── */
 @keyframes call-panel-expand {
   from {
@@ -471,6 +526,28 @@ textarea:focus-visible {
     margin-top: 0;
   }
 }
+@keyframes welcome-mascot-in {
+  from {
+    opacity: 0;
+    transform: scale(0.5) rotate(-8deg);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+@keyframes welcome-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @keyframes sp-check-draw {
   from {
     stroke-dashoffset: 24;

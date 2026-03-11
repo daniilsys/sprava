@@ -4,5 +4,16 @@
 <dict>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Sprava needs access to your microphone for voice chat.</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.sprava.desktop</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>sprava</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

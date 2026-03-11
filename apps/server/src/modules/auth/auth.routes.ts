@@ -9,7 +9,7 @@ import {
 } from "../../middlewares/rateLimiter.middleware.js";
 import { hcaptcha } from "../../middlewares/hcaptcha.middleware.js";
 import { authMiddleware } from "../../middlewares/auth.middleware.js";
-import { changePasswordSchema, forgotPasswordSchema, resetPasswordSchema } from "./auth.schema.js";
+import { changePasswordSchema, changeEmailSchema, forgotPasswordSchema, resetPasswordSchema } from "./auth.schema.js";
 
 const router = Router();
 const controller = new AuthController();
@@ -36,6 +36,12 @@ router.post(
   "/resend-verification",
   authMiddleware,
   controller.resendVerification,
+);
+router.patch(
+  "/change-email",
+  authMiddleware,
+  validate(changeEmailSchema),
+  controller.changeEmail,
 );
 router.patch(
   "/change-password",

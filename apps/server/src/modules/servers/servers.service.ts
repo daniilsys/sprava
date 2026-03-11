@@ -13,7 +13,7 @@ import {
   toMemberResponse,
   toServerBanResponse,
 } from "./servers.mapper.js";
-import { toChannelResponse } from "../channels/channels.mapper.js";
+import { toChannelResponse, toChannelRuleResponse } from "../channels/channels.mapper.js";
 import {
   checkPermission,
   checkRoleHierarchy,
@@ -279,23 +279,36 @@ export class ServersService {
 
     await prisma.serverMember.create({ data: { serverId: server.id, userId } });
 
-    const io = getIO();
-    if (io) {
-      const channels = await prisma.channel.findMany({
-        where: { serverId: server.id },
-        select: { id: true },
-      });
-      io.in(`user:${userId}`).socketsJoin(`server:${server.id}`);
-      for (const { id } of channels) {
-        io.in(`user:${userId}`).socketsJoin(`channel:${id}`);
-      }
-
-      const newMember = await prisma.serverMember.findUnique({
+    // Fetch full server data + channel rules + new member in parallel (single round-trip)
+    const [full, channelRuleRows, newMember] = await Promise.all([
+      prisma.server.findUnique({
+        where: { id: server.id },
+        include: {
+          channels: { orderBy: { position: "asc" } },
+          roles: { orderBy: { position: "asc" } },
+        },
+      }),
+      prisma.channelRule.findMany({
+        where: { channel: { serverId: server.id } },
+      }),
+      prisma.serverMember.findUnique({
         where: { userId_serverId: { userId, serverId: server.id } },
         include: {
           user: { select: { id: true, username: true, avatar: true } },
         },
-      });
+      }),
+    ]);
+
+    const io = getIO();
+    if (io) {
+      // Use channels from the full query — no extra fetch needed
+      io.in(`user:${userId}`).socketsJoin(`server:${server.id}`);
+      if (full?.channels) {
+        for (const ch of full.channels) {
+          io.in(`user:${userId}`).socketsJoin(`channel:${ch.id}`);
+        }
+      }
+
       io.to(`server:${server.id}`).emit("server:member_join", {
         serverId: server.id,
         userId,
@@ -303,14 +316,11 @@ export class ServersService {
       });
     }
 
-    const full = await prisma.server.findUnique({
-      where: { id: server.id },
-      include: {
-        channels: { orderBy: { position: "asc" } },
-        roles: { orderBy: { position: "asc" } },
-      },
-    });
-    return full ? toServerResponse(full) : toServerResponse(server);
+    const response = full ? toServerResponse(full) : toServerResponse(server);
+    return {
+      ...response,
+      channelRules: channelRuleRows.map(toChannelRuleResponse),
+    };
   }
 
   async kickMember(serverId: string, targetUserId: string, userId: string) {

@@ -3,6 +3,8 @@ import { AppError } from "../utils/AppError.js";
 
 export const hcaptcha = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    if (process.env.HCAPTCHA_SECRET === "0") return next();
+
     const token = req.body["h-captcha-response"];
 
     if (!token) return next(new AppError("hCaptcha token missing", 400, "CAPTCHA_MISSING"));

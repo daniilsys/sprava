@@ -335,15 +335,6 @@ export function StatusPicker({ currentStatus, currentMessage, anchorRect, onClos
                   style={{ width: 18, height: 18 }}
                 >
                   <StatusIcon type={s.icon} color={s.cssColor} size={14} />
-                  {isActive && (
-                    <div
-                      className="absolute inset-0 rounded-full"
-                      style={{
-                        color: s.cssColor,
-                        animation: "sp-dot-pulse 2s ease-in-out infinite",
-                      }}
-                    />
-                  )}
                 </div>
 
                 <div className="min-w-0 flex-1">

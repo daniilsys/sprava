@@ -4,6 +4,7 @@ export const registerSchema = z.object({
   username: z.string().min(3).max(16),
   email: z.email(),
   password: z.string().min(8).max(100),
+  language: z.enum(["en", "fr"]).optional().default("en"),
   "h-captcha-response": z.string(),
 });
 
@@ -27,6 +28,12 @@ export const resetPasswordSchema = z.object({
   password: z.string().min(8).max(100),
 });
 
+export const changeEmailSchema = z.object({
+  password: z.string().min(1),
+  newEmail: z.email(),
+});
+
+export type ChangeEmailDto = z.infer<typeof changeEmailSchema>;
 export type ChangePasswordDto = z.infer<typeof changePasswordSchema>;
 export type RegisterDto = z.infer<typeof registerSchema>;
 export type LoginDto = z.infer<typeof loginSchema>;

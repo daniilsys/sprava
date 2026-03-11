@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { api } from "../lib/api";
+import { useAuthStore } from "./auth.store";
 import type { Friendship } from "../types/models";
 
 interface FriendsState {
@@ -20,6 +21,16 @@ interface FriendsState {
   blockUser(userId: string): Promise<void>;
   unblockUser(userId: string): Promise<void>;
   reload(): Promise<void>;
+}
+
+/** Find and remove a friendship involving a target userId from all lists */
+function removeByTargetUserId(state: Pick<FriendsState, "friends" | "blocked" | "pendingIncoming" | "pendingSent">, targetUserId: string) {
+  return {
+    friends: state.friends.filter((f) => f.sender.id !== targetUserId && f.receiver.id !== targetUserId),
+    blocked: state.blocked.filter((f) => f.sender.id !== targetUserId && f.receiver.id !== targetUserId),
+    pendingIncoming: state.pendingIncoming.filter((f) => f.sender.id !== targetUserId && f.receiver.id !== targetUserId),
+    pendingSent: state.pendingSent.filter((f) => f.sender.id !== targetUserId && f.receiver.id !== targetUserId),
+  };
 }
 
 export const useFriendsStore = create<FriendsState>((set, get) => ({
@@ -93,38 +104,41 @@ export const useFriendsStore = create<FriendsState>((set, get) => ({
   },
 
   async sendRequest(username) {
-    await api.friendships.sendRequest(username);
-    await get().reload();
+    const result = await api.friendships.sendRequest(username) as Friendship;
+    const currentUserId = useAuthStore.getState().user?.id ?? "";
+    get().addFriendship(result, currentUserId);
   },
 
   async acceptRequest(userId) {
-    await api.friendships.update({ status: "ACCEPTED", receiverId: userId });
-    await get().reload();
+    const result = await api.friendships.update({ status: "ACCEPTED", receiverId: userId }) as Friendship;
+    const currentUserId = useAuthStore.getState().user?.id ?? "";
+    get().updateFriendshipStatus(result, currentUserId);
   },
 
   async rejectRequest(userId) {
     await api.friendships.rejectRequest(userId);
-    await get().reload();
+    set((s) => removeByTargetUserId(s, userId));
   },
 
   async cancelRequest(userId) {
     await api.friendships.cancelRequest(userId);
-    await get().reload();
+    set((s) => removeByTargetUserId(s, userId));
   },
 
   async removeFriend(userId) {
     await api.friendships.remove(userId);
-    await get().reload();
+    set((s) => removeByTargetUserId(s, userId));
   },
 
   async blockUser(userId) {
-    await api.friendships.update({ status: "BLOCKED", receiverId: userId });
-    await get().reload();
+    const result = await api.friendships.update({ status: "BLOCKED", receiverId: userId }) as Friendship;
+    const currentUserId = useAuthStore.getState().user?.id ?? "";
+    get().updateFriendshipStatus(result, currentUserId);
   },
 
   async unblockUser(userId) {
     await api.friendships.unblock(userId);
-    await get().reload();
+    set((s) => removeByTargetUserId(s, userId));
   },
 
   async reload() {

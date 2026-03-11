@@ -36,3 +36,4 @@ deep_filter = { git = "https://github.com/Rikorose/DeepFilterNet.git", tag = "v0
 ] }
 ndarray = "0.15"
 nnnoiseless = "0.5"
+tauri-plugin-deep-link = "2"

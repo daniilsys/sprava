@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, memo } from "react";
 import { useTranslation } from "react-i18next";
 import { MessageActions } from "./MessageActions";
 import { ReactionBar } from "./ReactionBar";
@@ -25,7 +25,7 @@ interface MessageItemProps {
   onJumpToMessage?: (messageId: string) => void;
 }
 
-export function MessageItem({ message, isFirst, highlighted, onJumpToMessage }: MessageItemProps) {
+export const MessageItem = memo(function MessageItem({ message, isFirst, highlighted, onJumpToMessage }: MessageItemProps) {
   const { t } = useTranslation("chat");
   const [hovered, setHovered] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -148,4 +148,14 @@ export function MessageItem({ message, isFirst, highlighted, onJumpToMessage }: 
       )}
     </div>
   );
-}
+}, (prev, next) =>
+  prev.message.id === next.message.id &&
+  prev.message.content === next.message.content &&
+  prev.message.editedAt === next.message.editedAt &&
+  prev.message.reactions.length === next.message.reactions.length &&
+  prev.message.pending === next.message.pending &&
+  prev.message.failed === next.message.failed &&
+  prev.isFirst === next.isFirst &&
+  prev.highlighted === next.highlighted &&
+  prev.onJumpToMessage === next.onJumpToMessage,
+);

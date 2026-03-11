@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import { AuthService } from "./auth.service.js";
+import { verifySuccessPage, verifyErrorPage } from "../../config/email.js";
 
 const authService = new AuthService();
 
@@ -42,13 +43,15 @@ export class AuthController {
     }
   };
 
-  verifyEmail = async (req: Request, res: Response, next: NextFunction) => {
+  verifyEmail = async (req: Request, res: Response, _next: NextFunction) => {
     try {
       const { token } = req.query as { token: string };
       await authService.verifyEmail(token);
-      res.json({ message: "Email verified successfully" });
-    } catch (err) {
-      next(err);
+      res.type("html").send(verifySuccessPage());
+    } catch {
+      res.type("html").status(400).send(verifyErrorPage(
+        "Le lien de v&eacute;rification est invalide ou a expir&eacute;. Veuillez demander un nouveau lien depuis l&rsquo;application."
+      ));
     }
   };
 
@@ -60,6 +63,15 @@ export class AuthController {
     try {
       await authService.resendVerification(req.userId!);
       res.json({ message: "Verification email sent" });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  changeEmail = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await authService.changeEmail(req.userId!, req.body);
+      res.json({ message: "Email changed, verification email sent" });
     } catch (err) {
       next(err);
     }
