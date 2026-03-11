@@ -1,5 +1,6 @@
 import { playMessageSound, playMentionSound } from "./sounds";
 import { useUIStore } from "../store/ui.store";
+import { useAppStore } from "../store/app.store";
 
 /**
  * Check if the app window is focused.
@@ -53,6 +54,10 @@ export async function notifyMessage(opts: NotifyOptions) {
 
   // Don't notify for own messages
   if (authorId === currentUserId) return;
+
+  // Don't notify when user is DND
+  const presence = useAppStore.getState().presence.get(currentUserId);
+  if (presence?.status === "dnd") return;
 
   // Don't notify for muted contexts
   const uiState = useUIStore.getState();

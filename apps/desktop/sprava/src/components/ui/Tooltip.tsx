@@ -1,4 +1,5 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useLayoutEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 
 interface TooltipProps {
   content?: string;
@@ -7,23 +8,56 @@ interface TooltipProps {
   delay?: number;
 }
 
-const positionClasses = {
-  top: "bottom-full left-1/2 -translate-x-1/2 mb-2",
-  bottom: "top-full left-1/2 -translate-x-1/2 mt-2",
-  left: "right-full top-1/2 -translate-y-1/2 mr-2",
-  right: "left-full top-1/2 -translate-y-1/2 ml-2",
-};
-
-const caretClasses = {
-  top: "top-full left-1/2 -translate-x-1/2 border-t-elevated-2 border-x-transparent border-b-transparent",
-  bottom: "bottom-full left-1/2 -translate-x-1/2 border-b-elevated-2 border-x-transparent border-t-transparent",
-  left: "left-full top-1/2 -translate-y-1/2 border-l-elevated-2 border-y-transparent border-r-transparent",
-  right: "right-full top-1/2 -translate-y-1/2 border-r-elevated-2 border-y-transparent border-l-transparent",
-};
+const OFFSET = 8;
 
 export function Tooltip({ content, children, side = "top", delay = 300 }: TooltipProps) {
   const [visible, setVisible] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const triggerRef = useRef<HTMLDivElement>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ x: 0, y: 0 });
+
+  const computePosition = useCallback(() => {
+    const trigger = triggerRef.current;
+    const tooltip = tooltipRef.current;
+    if (!trigger || !tooltip) return;
+
+    const rect = trigger.getBoundingClientRect();
+    const tt = tooltip.getBoundingClientRect();
+
+    let x = 0;
+    let y = 0;
+
+    switch (side) {
+      case "right":
+        x = rect.right + OFFSET;
+        y = rect.top + rect.height / 2 - tt.height / 2;
+        break;
+      case "left":
+        x = rect.left - tt.width - OFFSET;
+        y = rect.top + rect.height / 2 - tt.height / 2;
+        break;
+      case "bottom":
+        x = rect.left + rect.width / 2 - tt.width / 2;
+        y = rect.bottom + OFFSET;
+        break;
+      case "top":
+      default:
+        x = rect.left + rect.width / 2 - tt.width / 2;
+        y = rect.top - tt.height - OFFSET;
+        break;
+    }
+
+    // Clamp to viewport
+    x = Math.max(4, Math.min(x, window.innerWidth - tt.width - 4));
+    y = Math.max(4, Math.min(y, window.innerHeight - tt.height - 4));
+
+    setPos({ x, y });
+  }, [side]);
+
+  useLayoutEffect(() => {
+    if (visible) computePosition();
+  }, [visible, computePosition]);
 
   const show = () => {
     timeoutRef.current = setTimeout(() => setVisible(true), delay);
@@ -37,18 +71,19 @@ export function Tooltip({ content, children, side = "top", delay = 300 }: Toolti
   if (!content) return <>{children}</>;
 
   return (
-    <div className="relative inline-flex" onMouseEnter={show} onMouseLeave={hide}>
+    <div ref={triggerRef} className="relative inline-flex" onMouseEnter={show} onMouseLeave={hide}>
       {children}
-      {visible && (
-        <div
-          className={`absolute z-50 whitespace-nowrap rounded-lg bg-elevated-2 border border-border-subtle px-2.5 py-1.5 text-xs font-medium text-text-primary shadow-xl pointer-events-none animate-tooltip ${positionClasses[side]}`}
-        >
-          {content}
-          <span
-            className={`absolute w-0 h-0 border-[5px] ${caretClasses[side]}`}
-          />
-        </div>
-      )}
+      {visible &&
+        createPortal(
+          <div
+            ref={tooltipRef}
+            className="fixed z-[9999] whitespace-nowrap rounded-lg bg-elevated-2 border border-border-subtle px-2.5 py-1.5 text-xs font-medium text-text-primary shadow-xl pointer-events-none animate-tooltip"
+            style={{ left: pos.x, top: pos.y }}
+          >
+            {content}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

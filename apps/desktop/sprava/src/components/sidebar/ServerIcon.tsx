@@ -46,6 +46,19 @@ export function ServerIcon({ server }: ServerIconProps) {
     return false;
   });
 
+  const hasVoiceUsers = useAppStore((s) => {
+    const serverChannelIds = new Set<string>();
+    for (const ch of s.channels.values()) {
+      if (ch.serverId === server.id) serverChannelIds.add(ch.id);
+    }
+    for (const vs of s.voiceStates.values()) {
+      // roomId format is "channel:{channelId}" for server channels
+      const channelId = vs.roomId.startsWith("channel:") ? vs.roomId.slice(8) : vs.roomId;
+      if (serverChannelIds.has(channelId)) return true;
+    }
+    return false;
+  });
+
   const handleLeave = async () => {
     if (!(await confirm(`Leave "${server.name}"?`))) return;
     try {
@@ -99,6 +112,15 @@ export function ServerIcon({ server }: ServerIconProps) {
             <span className="text-sm font-medium">{getInitials(server.name)}</span>
           )}
         </button>
+
+        {hasVoiceUsers && (
+          <span className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-live rounded-full border-2 border-bg flex items-center justify-center animate-badge-pop">
+            <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="var(--color-bg)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+            </svg>
+          </span>
+        )}
 
         {menu && (
           <ContextMenu x={menu.x} y={menu.y} items={menuItems} onClose={() => setMenu(null)} />

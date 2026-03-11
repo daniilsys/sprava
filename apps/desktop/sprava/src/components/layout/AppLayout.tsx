@@ -14,7 +14,7 @@ import { DmCallBanner } from "../voice/DmCallBanner";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { CommandPalette } from "../ui/CommandPalette";
 import { ConnectionBanner } from "../ui/ConnectionBanner";
-import { UpdateBanner } from "../ui/UpdateBanner";
+import { TitleBar } from "./TitleBar";
 
 export function AppLayout() {
   const [incomingCall, setIncomingCall] = useState<{ dmConversationId: string; callerId: string } | null>(null);
@@ -93,8 +93,8 @@ export function AppLayout() {
 
   return (
     <div className={`flex flex-col h-screen w-screen overflow-hidden ${isVoiceConnected ? "pb-12" : ""}`}>
+      <TitleBar />
       <ConnectionBanner />
-      <UpdateBanner />
       <div className="flex flex-1 min-h-0">
       <ArcSidebar />
       {activeServerId && <ChannelSidebar serverId={activeServerId} />}

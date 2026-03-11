@@ -9,6 +9,9 @@ interface UpdaterState {
   error: string | null;
 }
 
+// ── DEV MOCK: set to true to test the update UI ──
+const FAKE_UPDATE = import.meta.env.DEV && true;
+
 export function useUpdater() {
   const [state, setState] = useState<UpdaterState>({
     available: false,
@@ -21,19 +24,29 @@ export function useUpdater() {
 
   // Check on mount, then every 30 minutes
   useEffect(() => {
+    if (FAKE_UPDATE) {
+      console.log("[updater] Using fake update for dev testing");
+      setState((s) => ({ ...s, available: true, version: "0.2.0" }));
+      return;
+    }
+
     let cancelled = false;
 
     async function checkForUpdate() {
       try {
+        console.log("[updater] Checking for updates...");
         const result = await check();
         if (cancelled) return;
         if (result) {
+          console.log(`[updater] Update available: v${result.version}`);
           setUpdate(result);
           setState((s) => ({ ...s, available: true, version: result.version }));
+        } else {
+          console.log("[updater] No update available, already on latest version");
         }
       } catch (e) {
         if (!cancelled) {
-          console.warn("Update check failed:", e);
+          console.error("[updater] Update check failed:", e);
         }
       }
     }
@@ -47,6 +60,16 @@ export function useUpdater() {
   }, []);
 
   const install = useCallback(async () => {
+    if (FAKE_UPDATE) {
+      // Simulate download progress
+      setState((s) => ({ ...s, downloading: true, progress: 0 }));
+      for (let i = 0; i <= 100; i += 10) {
+        await new Promise((r) => setTimeout(r, 200));
+        setState((s) => ({ ...s, progress: i }));
+      }
+      setState((s) => ({ ...s, downloading: false, available: false }));
+      return;
+    }
     if (!update) return;
     setState((s) => ({ ...s, downloading: true, progress: 0, error: null }));
     try {
