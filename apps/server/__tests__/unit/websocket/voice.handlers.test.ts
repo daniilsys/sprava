@@ -24,12 +24,14 @@ function createMockSocket(userId: string) {
 }
 
 function createMockIO() {
-  const chainable = {
+  const chainable: Record<string, any> = {
     emit: vi.fn(),
     socketsJoin: vi.fn(),
     socketsLeave: vi.fn(),
     fetchSockets: vi.fn(async () => []),
   };
+  // except() returns the same chainable so .emit() can be called after it
+  chainable.except = vi.fn(() => chainable);
   return {
     to: vi.fn(() => chainable),
     in: vi.fn(() => chainable),
@@ -171,20 +173,12 @@ describe("Voice Handlers", () => {
       vi.mocked(redis.scard).mockResolvedValue(1); // first joiner
       vi.mocked(redis.smembers).mockResolvedValue(["user-1"]);
 
-      // Mock fetchSockets: first call returns caller sockets, second returns DM room sockets
-      const otherSocket = { id: "other-socket", emit: vi.fn() };
-      io._chainable.fetchSockets
-        .mockResolvedValueOnce([{ id: "caller-socket" }]) // caller's sockets
-        .mockResolvedValueOnce([
-          { id: "caller-socket", emit: socket.emit }, // caller (excluded)
-          otherSocket, // other DM participant
-        ]);
-
       const handler = socket._handlers.get("voice:join");
       await handler!({ dmConversationId: "dm1" });
 
-      // Should emit dm_call_incoming to other DM participants (not the caller)
-      expect(otherSocket.emit).toHaveBeenCalledWith("voice:dm_call_incoming", {
+      // Should emit dm_call_incoming via io.to(`dm:dm1`).except(`user:user-1`).emit(...)
+      expect(io._chainable.except).toHaveBeenCalledWith("user:user-1");
+      expect(io._chainable.emit).toHaveBeenCalledWith("voice:dm_call_incoming", {
         dmConversationId: "dm1",
         callerId: "user-1",
       });

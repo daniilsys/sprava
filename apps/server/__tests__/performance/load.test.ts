@@ -80,12 +80,15 @@ describe("Performance: Concurrent Server Joins", () => {
   it("should handle 50 concurrent server joins", async () => {
     const service = new ServersService();
 
-    vi.mocked(prisma.server.findUnique).mockResolvedValue(
-      makeServer({ inviteCode: "test-code" }) as any,
-    );
+    vi.mocked(prisma.server.findUnique).mockResolvedValue({
+      ...makeServer({ inviteCode: "test-code" }),
+      channels: [],
+      roles: [],
+    } as any);
     vi.mocked(prisma.serverMember.findUnique).mockResolvedValue(null); // not yet a member
     vi.mocked(prisma.serverMember.create).mockResolvedValue({} as any);
     vi.mocked(prisma.channel.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.channelRule.findMany).mockResolvedValue([]);
 
     const start = performance.now();
 

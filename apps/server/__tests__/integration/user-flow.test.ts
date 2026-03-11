@@ -248,6 +248,13 @@ describe("Integration: DM Flow", () => {
     const dm = makeDm({ id: "dm1", type: "PRIVATE" });
     vi.mocked(prisma.dmConversation.create).mockResolvedValue(dm as any);
     vi.mocked(prisma.dmParticipant.create).mockResolvedValue({} as any);
+    vi.mocked(prisma.dmConversation.findUniqueOrThrow).mockResolvedValue({
+      ...dm,
+      participants: [
+        { userId: "user-1", user: { id: "user-1", username: "user1", avatar: null } },
+        { userId: "user-2", user: { id: "user-2", username: "user2", avatar: null } },
+      ],
+    } as any);
 
     const res = await request
       .post("/dm")

@@ -34,6 +34,15 @@ describe("DmService", () => {
         return fn(tx);
       });
 
+      // After $transaction, service calls findUniqueOrThrow to get full DM
+      vi.mocked(prisma.dmConversation.findUniqueOrThrow).mockResolvedValue({
+        ...dm,
+        participants: [
+          { userId: "user-1", user: { id: "user-1", username: "user1", avatar: null } },
+          { userId: "user-2", user: { id: "user-2", username: "user2", avatar: null } },
+        ],
+      } as any);
+
       const result = await service.create(
         { participantIds: ["user-1", "user-2"] },
         "user-1",
@@ -94,6 +103,16 @@ describe("DmService", () => {
         };
         return fn(tx);
       });
+
+      // After $transaction, service calls findUniqueOrThrow to get full group
+      vi.mocked(prisma.dmConversation.findUniqueOrThrow).mockResolvedValue({
+        ...dm,
+        participants: [
+          { userId: "user-1", user: { id: "user-1", username: "user1", avatar: null } },
+          { userId: "user-2", user: { id: "user-2", username: "user2", avatar: null } },
+          { userId: "user-3", user: { id: "user-3", username: "user3", avatar: null } },
+        ],
+      } as any);
 
       const result = await service.create(
         { participantIds: ["user-1", "user-2", "user-3"] },

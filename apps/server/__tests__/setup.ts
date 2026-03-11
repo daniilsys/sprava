@@ -10,6 +10,7 @@ import { vi } from "vitest";
 function createModelMock() {
   return {
     findUnique: vi.fn(),
+    findUniqueOrThrow: vi.fn(),
     findFirst: vi.fn(),
     findMany: vi.fn(),
     create: vi.fn(),
@@ -87,11 +88,12 @@ vi.mock("../src/config/redis.js", () => ({ redis: mockRedis }));
 // ─── Mock: Socket.io getIO ──────────────────────────────────────────────────
 
 function createMockIO() {
-  const chainable = {
+  const chainable: Record<string, any> = {
     emit: vi.fn(),
     socketsJoin: vi.fn(),
     socketsLeave: vi.fn(),
   };
+  chainable.except = vi.fn(() => chainable);
   return {
     to: vi.fn(() => chainable),
     in: vi.fn(() => chainable),

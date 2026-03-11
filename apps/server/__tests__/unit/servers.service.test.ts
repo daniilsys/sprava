@@ -128,10 +128,17 @@ describe("ServersService", () => {
   describe("joinByInviteCode", () => {
     it("should join server with valid invite code", async () => {
       const server = makeServer({ inviteCode: "abc123" });
-      vi.mocked(prisma.server.findUnique).mockResolvedValue(server as any);
-      vi.mocked(prisma.serverMember.findUnique).mockResolvedValue(null); // not already member
+      vi.mocked(prisma.server.findUnique).mockResolvedValue({
+        ...server,
+        channels: [],
+        roles: [],
+      } as any);
+      vi.mocked(prisma.serverMember.findUnique)
+        .mockResolvedValueOnce(null) // not already member (first check)
+        .mockResolvedValueOnce({ userId: "user-2", user: { id: "user-2", username: "user2", avatar: null } } as any); // new member fetch
       vi.mocked(prisma.serverMember.create).mockResolvedValue({} as any);
       vi.mocked(prisma.channel.findMany).mockResolvedValue([]);
+      vi.mocked(prisma.channelRule.findMany).mockResolvedValue([]);
 
       const result = await service.joinByInviteCode("abc123", "user-2");
       expect(result).toBeTruthy();
